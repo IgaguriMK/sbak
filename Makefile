@@ -1,5 +1,7 @@
 CRATE_NAME:=sbak
 
+DOC_OPTION:=--no-deps
+
 export GIT_BRANCH:=$(shell git rev-parse --abbrev-ref HEAD)
 export GIT_HASH:=$(shell git rev-parse HEAD)
 export GIT_DIFF:=$(shell git diff HEAD | wc -l)
@@ -31,7 +33,11 @@ check: soft-clean
 
 .PHONY: doc
 doc: check
-	cargo doc --no-deps
+	cargo doc $(DOC_OPTION)
+
+.PHONY: doc-open
+doc-open: check
+	cargo doc $(DOC_OPTION) --open
 
 .PHONY: release
 release: check pack
