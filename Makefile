@@ -47,5 +47,3 @@ soft-clean:
 clean:
 	cargo clean
 	- rm $(CRATE_NAME).tar.gz
-	- rm *.zone
-	- rm *.rev
