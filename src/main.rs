@@ -1,7 +1,8 @@
 use clap::{App, crate_name,  crate_authors, crate_description};
 use failure::Fail;
 
-use  sbak::sub::{Error as SubCmdError, sub_commands};
+use sbak::core::scan::{self, Scanner};
+use sbak::sub::{Error as SubCmdError, sub_commands};
 use sbak::version::version;
 
 fn main() {
@@ -32,7 +33,9 @@ fn w_main() -> Result<(), Error> {
         }
     }
 
-    println!("main command");
+    let scanner = Scanner::new();
+    let tree = scanner.scan("./sample-target")?;
+    println!("{:#?}", tree);
 
     Ok(())
 }
@@ -44,10 +47,18 @@ enum Error {
         #[fail(cause)]
         cause: SubCmdError,
     },
+    #[fail(display = "{}", _0)]
+    Other(#[fail(cause)] Box<dyn Fail>),
 }
 
 impl From<SubCmdError> for Error {
     fn from(cause: SubCmdError) -> Error {
         Error::SubCmd{cause}
+    }
+}
+
+impl From<scan::Error> for Error {
+    fn from(cause: scan::Error) -> Error {
+        Error::Other(Box::new(cause))
     }
 }
