@@ -2,47 +2,67 @@
 
 use std::fs;
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::time::{SystemTimeError, UNIX_EPOCH};
 
 use failure::Fail;
 
 use crate::core::fs_tree::*;
 
 #[derive(Debug, Clone, Default)]
-pub struct Scanner {
-}
+pub struct Scanner {}
 
 impl Scanner {
     pub fn new() -> Scanner {
-        Scanner{}
+        Scanner {}
     }
 
     pub fn scan<P: AsRef<Path>>(&self, p: P) -> Result<FsEntry> {
-        let meta = fs::metadata(&p)?;
-        
-        if meta.is_dir() {
-            Ok(self.scan_dir(p)?.into())
-        } else if meta.is_file() {
-            Ok(self.scan_file(p)?.into())
+        let p = p.as_ref();
+        self.scan_i(p, p)
+    }
+
+    fn scan_i(&self, base: &Path, p: &Path) -> Result<FsEntry> {
+        let fs_meta = fs::metadata(&p)?;
+        let meta = convert_metadata(&fs_meta)?;
+        if fs_meta.is_dir() {
+            Ok(self.scan_dir(base, p, meta)?.into())
+        } else if fs_meta.is_file() {
+            Ok(self.scan_file(base, p, meta)?.into())
         } else {
-            panic!("{:?} is not dir nor file", p.as_ref())
+            panic!("{:?} is not dir nor file", p)
         }
     }
 
-    fn scan_dir<P: AsRef<Path>>(&self, p: P) -> Result<DirEntry> {
-        let mut entry = DirEntry::new(&p);
+    fn scan_dir(&self, base: &Path, p: &Path, meta: Metadata) -> Result<DirEntry> {
+        let mut entry = DirEntry::new(strip_path(base, p)?, meta);
 
         for ch in fs::read_dir(p)? {
             let ch = ch?;
-            entry.append(self.scan(ch.path())?);
+            entry.append(self.scan_i(base, &ch.path())?);
         }
 
         Ok(entry)
     }
 
-    fn scan_file<P: AsRef<Path>>(&self, p: P) -> Result<FileEntry> {
-        Ok(FileEntry::new(p))
-    }    
+    fn scan_file(&self, base: &Path, p: &Path, meta: Metadata) -> Result<FileEntry> {
+        Ok(FileEntry::new(strip_path(base, p)?, meta))
+    }
+}
+
+fn convert_metadata(fs_meta: &fs::Metadata) -> Result<Metadata> {
+    let readonly = fs_meta.permissions().readonly();
+    let unix_time_u64 = fs_meta.modified()?.duration_since(UNIX_EPOCH)?.as_secs();
+    let timestamp = Timestamp::from_unix_time(unix_time_u64);
+
+    Ok(Metadata::new(readonly, timestamp))
+}
+
+fn strip_path(base: &Path, path: &Path) -> Result<PathBuf> {
+    let p = path
+        .strip_prefix(base)
+        .map_err(|_| Error::OutOfBaseDir(path.to_owned()))?;
+    Ok(p.to_owned())
 }
 
 type Result<T> = std::result::Result<T, Error>;
@@ -50,12 +70,22 @@ type Result<T> = std::result::Result<T, Error>;
 /// ファイルシステムのスキャンで発生しうるエラー
 #[derive(Debug, Fail)]
 pub enum Error {
-    #[fail(display="failed scan with IO error: {}", _0)]
+    #[fail(display = "failed scan with IO error: {}", _0)]
     IO(#[fail(cause)] io::Error),
+    #[fail(display = "timestamp is older than UNIX epoch")]
+    Timestamp,
+    #[fail(display = "path is out of base path: {:?}", _0)]
+    OutOfBaseDir(PathBuf),
 }
 
 impl From<io::Error> for Error {
     fn from(e: io::Error) -> Error {
         Error::IO(e)
+    }
+}
+
+impl From<SystemTimeError> for Error {
+    fn from(_e: SystemTimeError) -> Error {
+        Error::Timestamp
     }
 }

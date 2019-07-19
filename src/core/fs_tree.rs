@@ -43,13 +43,15 @@ impl From<FileEntry> for FsEntry {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DirEntry {
     path: PathBuf,
+    meta: Metadata,
     childlen: Vec<FsEntry>,
 }
 
 impl DirEntry {
-    pub fn new<P: AsRef<Path>>(path: P) -> DirEntry {
+    pub fn new(path: PathBuf, meta: Metadata) -> DirEntry {
         DirEntry {
-            path: path.as_ref().to_owned(),
+            path,
+            meta,
             childlen: Vec::new(),
         }
     }
@@ -69,12 +71,14 @@ impl Entry for DirEntry {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FileEntry {
     path: PathBuf,
+    meta: Metadata,
 }
 
 impl FileEntry {
-    pub fn new<P: AsRef<Path>>(path: P) -> FileEntry {
+    pub fn new(path: PathBuf, meta: Metadata) -> FileEntry {
         FileEntry {
-            path: path.as_ref().to_owned(),
+            path,
+            meta,
         }
     }
 }
@@ -82,5 +86,31 @@ impl FileEntry {
 impl Entry for FileEntry {
     fn path(&self) -> &Path {
         &self.path
+    }
+}
+
+/// ファイルやディレクトリの属性
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Metadata {
+    readonly: bool,
+    modified: Timestamp,
+}
+
+impl Metadata {
+    pub fn new(readonly: bool, modified: Timestamp) -> Metadata {
+        Metadata {
+            readonly,
+            modified,
+        }
+    }
+}
+
+/// ファイルの更新日時
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct Timestamp(u64);
+
+impl Timestamp {
+    pub fn from_unix_time(t: u64) -> Timestamp {
+        Timestamp(t)
     }
 }
