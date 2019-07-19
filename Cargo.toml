@@ -5,3 +5,5 @@ authors = ["Igaguri <igagurimk@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+clap = "2.33"
+failure = "0.1.5"
