@@ -29,6 +29,10 @@ check: soft-clean
 	cargo test
 	cargo clippy -- -D warnings
 
+.PHONY: doc
+doc: check
+	cargo doc --no-deps
+
 .PHONY: release
 release: check pack
 
