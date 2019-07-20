@@ -2,9 +2,9 @@
 
 pub mod io;
 
-use std::path::{PathBuf, Path};
+use std::path::{Path, PathBuf};
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// 各種エントリに共通した属性取得操作のトレイト
 pub trait Entry {
@@ -15,7 +15,9 @@ pub trait Entry {
 /// ファイルシステムの1エントリの表現
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FsEntry {
+    #[serde(rename = "d")]
     Dir(DirEntry),
+    #[serde(rename = "f")]
     File(FileEntry),
     // Symlink(SymlinkEntry) // TODO: シンボリックリンクを実装する
 }
@@ -44,8 +46,11 @@ impl From<FileEntry> for FsEntry {
 /// ディレクトリの各種情報
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DirEntry {
+    #[serde(rename = "p")]
     path: PathBuf,
+    #[serde(rename = "m")]
     meta: Metadata,
+    #[serde(rename = "ch")]
     childlen: Vec<FsEntry>,
 }
 
@@ -72,16 +77,15 @@ impl Entry for DirEntry {
 /// ファイルの各種情報
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FileEntry {
+    #[serde(rename = "p")]
     path: PathBuf,
+    #[serde(rename = "m")]
     meta: Metadata,
 }
 
 impl FileEntry {
     pub fn new(path: PathBuf, meta: Metadata) -> FileEntry {
-        FileEntry {
-            path,
-            meta,
-        }
+        FileEntry { path, meta }
     }
 }
 
@@ -94,16 +98,15 @@ impl Entry for FileEntry {
 /// ファイルやディレクトリの属性
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Metadata {
+    #[serde(rename = "r")]
     readonly: bool,
+    #[serde(rename = "mod")]
     modified: Timestamp,
 }
 
 impl Metadata {
     pub fn new(readonly: bool, modified: Timestamp) -> Metadata {
-        Metadata {
-            readonly,
-            modified,
-        }
+        Metadata { readonly, modified }
     }
 }
 
