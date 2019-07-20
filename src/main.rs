@@ -2,7 +2,7 @@ use clap::{App, crate_name,  crate_authors, crate_description};
 use failure::Fail;
 
 use sbak::core::scan::{self, Scanner};
-use sbak::sub::{Error as SubCmdError, sub_commands};
+use sbak::sub::sub_commands;
 use sbak::version::version;
 
 fn main() {
@@ -29,7 +29,7 @@ fn w_main() -> Result<(), Error> {
 
     if let (subcmd_name, Some(matches)) = matches.subcommand() {
         if subcmd_name != "" {
-            return Ok(subs.execute(subcmd_name, matches)?);
+            subs.execute(subcmd_name, matches);
         }
     }
 
@@ -42,19 +42,8 @@ fn w_main() -> Result<(), Error> {
 
 #[derive(Debug, Fail)]
 enum Error {
-    #[fail(display = "failed execute subcommand: {}", cause)]
-    SubCmd{
-        #[fail(cause)]
-        cause: SubCmdError,
-    },
     #[fail(display = "{}", _0)]
     Other(#[fail(cause)] Box<dyn Fail>),
-}
-
-impl From<SubCmdError> for Error {
-    fn from(cause: SubCmdError) -> Error {
-        Error::SubCmd{cause}
-    }
 }
 
 impl From<scan::Error> for Error {
