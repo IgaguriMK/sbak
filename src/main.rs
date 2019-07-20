@@ -1,5 +1,5 @@
-use std::process::exit;
 use std::io::{stderr, Write};
+use std::process::exit;
 
 use clap::{crate_authors, crate_description, crate_name, App};
 
@@ -18,7 +18,7 @@ fn main() {
 
     let mut help_str = Vec::<u8>::new();
     app.write_long_help(&mut help_str).unwrap();
-    
+
     let matches = app.get_matches();
 
     if let (subcmd_name, Some(matches)) = matches.subcommand() {

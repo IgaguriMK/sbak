@@ -1,14 +1,13 @@
 use clap::{App, ArgMatches, SubCommand};
-use std::process::exit;
 use std::path::PathBuf;
+use std::process::exit;
 
 use failure::Fail;
 
 use super::SubCmd;
 
-use crate::core::scan::{self, Scanner};
 use crate::core::fs_tree::io::{load_fs_tree, save_fs_tree, LoadError, SaveError};
-
+use crate::core::scan::{self, Scanner};
 
 pub fn new() -> Box<dyn SubCmd> {
     Box::new(Backup::new())
@@ -50,8 +49,7 @@ impl SubCmd for Backup {
     }
 
     fn command_args(&self) -> App<'static, 'static> {
-        SubCommand::with_name(self.name())
-            .about("Backup files")
+        SubCommand::with_name(self.name()).about("Backup files")
     }
 
     fn exec(&self, matches: &ArgMatches) -> ! {

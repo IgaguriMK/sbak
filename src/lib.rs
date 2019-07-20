@@ -1,3 +1,3 @@
-pub mod sub;
 pub mod core;
+pub mod sub;
 pub mod version;

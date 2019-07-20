@@ -1,6 +1,6 @@
 use std::fs::File;
-use std::path::Path;
 use std::io::{self, BufReader};
+use std::path::Path;
 
 use failure::Fail;
 use serde_json::{self, from_reader, to_writer};

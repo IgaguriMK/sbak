@@ -34,7 +34,7 @@ impl<'a> SubCommandSet {
     }
 
     pub fn execute(&self, name: &str, matches: &ArgMatches) {
-        if let Some(cmd) = self.table.get(name){
+        if let Some(cmd) = self.table.get(name) {
             cmd.exec(matches);
         }
     }
