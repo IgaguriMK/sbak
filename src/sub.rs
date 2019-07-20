@@ -33,9 +33,10 @@ impl<'a> SubCommandSet {
         self.table.iter().map(|(_, c)| c.command_args())
     }
 
-    pub fn execute(&self, name: &str, matches: &ArgMatches) -> ! {
-        let cmd = self.table.get(name).unwrap();
-        cmd.exec(matches)
+    pub fn execute(&self, name: &str, matches: &ArgMatches) {
+        if let Some(cmd) = self.table.get(name){
+            cmd.exec(matches);
+        }
     }
 
     fn append(&mut self, subcmd: Box<dyn SubCmd>) {

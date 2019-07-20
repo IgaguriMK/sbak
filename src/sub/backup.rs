@@ -5,6 +5,9 @@ use failure::Fail;
 
 use super::SubCmd;
 
+use crate::core::scan::{self, Scanner};
+
+
 pub fn new() -> Box<dyn SubCmd> {
     Box::new(Backup::new())
 }
@@ -17,7 +20,9 @@ impl Backup {
     }
 
     fn wrapped_exec(&self, _matches: &ArgMatches) -> Result<(), Error> {
-        println!("subcommand {}", self.name());
+        let scanner = Scanner::new();
+        let tree = scanner.scan("./sample-target")?;
+        println!("{:#?}", tree);
 
         Ok(())
     }
@@ -51,6 +56,12 @@ impl SubCmd for Backup {
 pub enum Error {
     // #[fail(display = "Found invalid command-line argument: {}", msg)]
     // InvalidArg { msg: &'static str },
-    #[fail(display = "dummy error")]
-    _Other,
+    #[fail(display = "file scan error: {}", _0)]
+    Scan(#[fail(cause)] scan::Error),
+}
+
+impl From<scan::Error> for Error {
+    fn from(e: scan::Error) -> Error {
+        Error::Scan(e)
+    }
 }
