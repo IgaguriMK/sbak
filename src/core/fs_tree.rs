@@ -1,5 +1,7 @@
 //!ファイルシステムのスキャン結果の表現
 
+pub mod io;
+
 use std::path::{PathBuf, Path};
 
 use serde::{Serialize, Deserialize};
