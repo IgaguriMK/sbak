@@ -2,15 +2,10 @@
 
 pub mod io;
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-/// 各種エントリに共通した属性取得操作のトレイト
-pub trait Entry {
-    /// スキャン原点となるパスからの相対パスを取得する。
-    fn path(&self) -> &Path;
-}
 
 /// ファイルシステムの1エントリの表現
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -20,15 +15,6 @@ pub enum FsEntry {
     #[serde(rename = "f")]
     File(FileEntry),
     // Symlink(SymlinkEntry) // TODO: シンボリックリンクを実装する
-}
-
-impl Entry for FsEntry {
-    fn path(&self) -> &Path {
-        match self {
-            FsEntry::Dir(ref dir) => dir.path(),
-            FsEntry::File(ref file) => file.path(),
-        }
-    }
 }
 
 impl From<DirEntry> for FsEntry {
@@ -46,18 +32,15 @@ impl From<FileEntry> for FsEntry {
 /// ディレクトリの各種情報
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DirEntry {
-    #[serde(rename = "p")]
-    path: PathBuf,
-    #[serde(rename = "m")]
+    #[serde(rename = "a")]
     attr: Attributes,
     #[serde(rename = "ch")]
     childlen: Vec<FsEntry>,
 }
 
 impl DirEntry {
-    pub fn new(path: PathBuf, attr: Attributes) -> DirEntry {
+    pub fn new(attr: Attributes) -> DirEntry {
         DirEntry {
-            path,
             attr,
             childlen: Vec::new(),
         }
@@ -68,36 +51,24 @@ impl DirEntry {
     }
 }
 
-impl Entry for DirEntry {
-    fn path(&self) -> &Path {
-        &self.path
-    }
-}
-
 /// ファイルの各種情報
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FileEntry {
-    #[serde(rename = "p")]
-    path: PathBuf,
-    #[serde(rename = "m")]
+    #[serde(rename = "a")]
     attr: Attributes,
 }
 
 impl FileEntry {
-    pub fn new(path: PathBuf, attr: Attributes) -> FileEntry {
-        FileEntry { path, attr }
-    }
-}
-
-impl Entry for FileEntry {
-    fn path(&self) -> &Path {
-        &self.path
+    pub fn new(attr: Attributes) -> FileEntry {
+        FileEntry { attr }
     }
 }
 
 /// ファイルやディレクトリの属性
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Attributes {
+    #[serde(rename = "p")]
+    path: PathBuf,
     #[serde(rename = "r")]
     readonly: bool,
     #[serde(rename = "mod")]
@@ -105,8 +76,8 @@ pub struct Attributes {
 }
 
 impl Attributes {
-    pub fn new(readonly: bool, modified: Timestamp) -> Attributes {
-        Attributes { readonly, modified }
+    pub fn new(path: PathBuf, readonly: bool, modified: Timestamp) -> Attributes {
+        Attributes {path,  readonly, modified }
     }
 }
 

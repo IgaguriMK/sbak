@@ -23,19 +23,19 @@ impl Scanner {
     }
 
     fn scan_i(&self, base: &Path, p: &Path) -> Result<FsEntry> {
-        let fs_meta = fs::metadata(&p)?;
-        let attr = convert_metadata(&fs_meta)?;
+        let fs_meta = fs::metadata(p)?;
+        let attr = convert_metadata(strip_path(base, p)?, &fs_meta)?;
         if fs_meta.is_dir() {
             Ok(self.scan_dir(base, p, attr)?.into())
         } else if fs_meta.is_file() {
-            Ok(self.scan_file(base, p, attr)?.into())
+            Ok(FileEntry::new(attr).into())
         } else {
             panic!("{:?} is not dir nor file", p)
         }
     }
 
     fn scan_dir(&self, base: &Path, p: &Path, attr: Attributes) -> Result<DirEntry> {
-        let mut entry = DirEntry::new(strip_path(base, p)?, attr);
+        let mut entry = DirEntry::new(attr);
 
         for ch in fs::read_dir(p)? {
             let ch = ch?;
@@ -44,18 +44,14 @@ impl Scanner {
 
         Ok(entry)
     }
-
-    fn scan_file(&self, base: &Path, p: &Path, attr: Attributes) -> Result<FileEntry> {
-        Ok(FileEntry::new(strip_path(base, p)?, attr))
-    }
 }
 
-fn convert_metadata(fs_meta: &fs::Metadata) -> Result<Attributes> {
+fn convert_metadata(path: PathBuf, fs_meta: &fs::Metadata) -> Result<Attributes> {
     let readonly = fs_meta.permissions().readonly();
     let unix_time_u64 = fs_meta.modified()?.duration_since(UNIX_EPOCH)?.as_secs();
     let timestamp = Timestamp::from_unix_time(unix_time_u64);
 
-    Ok(Attributes::new(readonly, timestamp))
+    Ok(Attributes::new(path, readonly, timestamp))
 }
 
 fn strip_path(base: &Path, path: &Path) -> Result<PathBuf> {
