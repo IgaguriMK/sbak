@@ -49,16 +49,16 @@ pub struct DirEntry {
     #[serde(rename = "p")]
     path: PathBuf,
     #[serde(rename = "m")]
-    meta: Metadata,
+    attr: Attributes,
     #[serde(rename = "ch")]
     childlen: Vec<FsEntry>,
 }
 
 impl DirEntry {
-    pub fn new(path: PathBuf, meta: Metadata) -> DirEntry {
+    pub fn new(path: PathBuf, attr: Attributes) -> DirEntry {
         DirEntry {
             path,
-            meta,
+            attr,
             childlen: Vec::new(),
         }
     }
@@ -80,12 +80,12 @@ pub struct FileEntry {
     #[serde(rename = "p")]
     path: PathBuf,
     #[serde(rename = "m")]
-    meta: Metadata,
+    attr: Attributes,
 }
 
 impl FileEntry {
-    pub fn new(path: PathBuf, meta: Metadata) -> FileEntry {
-        FileEntry { path, meta }
+    pub fn new(path: PathBuf, attr: Attributes) -> FileEntry {
+        FileEntry { path, attr }
     }
 }
 
@@ -97,16 +97,16 @@ impl Entry for FileEntry {
 
 /// ファイルやディレクトリの属性
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Metadata {
+pub struct Attributes {
     #[serde(rename = "r")]
     readonly: bool,
     #[serde(rename = "mod")]
     modified: Timestamp,
 }
 
-impl Metadata {
-    pub fn new(readonly: bool, modified: Timestamp) -> Metadata {
-        Metadata { readonly, modified }
+impl Attributes {
+    pub fn new(readonly: bool, modified: Timestamp) -> Attributes {
+        Attributes { readonly, modified }
     }
 }
 
