@@ -6,6 +6,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use failure::Fail;
+
 use serde_json::to_writer;
 
 use crate::core::entry::*;
@@ -31,7 +32,7 @@ impl<'a> Scanner<'a> {
         self.last_scan = timestamp;
     }
 
-    pub fn scan<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+    pub fn scan<P: AsRef<Path>>(self, path: P) -> Result<()> {
         let scan_start = Timestamp::now()?;
 
         let id = self.scan_i(path.as_ref())?;
