@@ -1,3 +1,5 @@
+//! タイムスタンプ
+
 use std::convert::TryFrom;
 use std::fmt;
 use std::time::{SystemTime, SystemTimeError, UNIX_EPOCH};
@@ -5,11 +7,19 @@ use std::time::{SystemTime, SystemTimeError, UNIX_EPOCH};
 use failure::Fail;
 use serde::{Deserialize, Serialize};
 
-/// ファイルの更新日時
+/// 秒精度のタイムスタンプ
+/// 
+/// [`std::time::SystemTime`](https://doc.rust-lang.org/std/time/struct.SystemTime.html) 由来の時刻をUNIX epochからの経過秒数で管理する。
+/// UNIX epochより古い時刻には対応していない。
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Timestamp(u64);
 
 impl Timestamp {
+    /// 現在時刻を取得する
+    /// 
+    /// # Failures
+    /// 
+    /// システムの現在時刻がUNIX epoch (`1970-01-01 00:00:00 UTC`) より前である場合、 [`Error::NegativeUnixTime`](enum.Error.html) を返す。
     pub fn now() -> Result<Timestamp> {
         Timestamp::try_from(SystemTime::now())
     }
@@ -34,12 +44,13 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Fail)]
 pub enum Error {
+    /// 対象日時のUNIX epochが負になっている
     #[fail(display = "timestamp is older than UNIX epoch")]
-    Timestamp,
+    NegativeUnixTime,
 }
 
 impl From<SystemTimeError> for Error {
     fn from(_e: SystemTimeError) -> Error {
-        Error::Timestamp
+        Error::NegativeUnixTime
     }
 }

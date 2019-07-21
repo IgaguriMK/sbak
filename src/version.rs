@@ -4,10 +4,12 @@
 ///
 /// 必要な環境変数は以下の通り。
 ///
-/// * `GIT_BRANCH` カレントブランチ名
-/// * `GIT_HASH` コミットのハッシュ値
-/// * `GIT_DIFF` `git diff` の行数
-/// * `GIT_UNTRACKED` Untrackedなファイルの有無 (0 = False, 1 = True)
+/// | 変数名 | 説明 |
+/// |:--:|:---|
+/// | `GIT_BRANCH`    | カレントブランチ名 |
+/// | `GIT_HASH`      | コミットのハッシュ値 |
+/// | `GIT_DIFF`      | `git diff` の行数 |
+/// | `GIT_UNTRACKED` | Untrackedなファイルの有無 (0 = False, 1 = True) |
 pub fn version(hash_len: usize) -> String {
     let base_ver = env!("CARGO_PKG_VERSION");
     let branch = option_env!("GIT_BRANCH").unwrap_or("unknown");
