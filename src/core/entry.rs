@@ -1,6 +1,5 @@
 //!ファイルシステムのスキャン結果の表現
 
-pub mod io;
 
 use std::convert::TryFrom;
 use std::path::{Path, PathBuf};
