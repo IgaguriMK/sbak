@@ -1,12 +1,13 @@
-use clap::{App, ArgMatches, SubCommand};
-use std::path::PathBuf;
+use std::io;
+use std::fs;
 use std::process::exit;
+use std::path::{Path, PathBuf};
 
+use clap::{App, ArgMatches, SubCommand};
 use failure::Fail;
 
 use super::SubCmd;
 
-use crate::core::fs_tree::io::{load_fs_tree, save_fs_tree, LoadError, SaveError};
 use crate::core::scan::{self, Scanner};
 
 pub fn new() -> Box<dyn SubCmd> {
@@ -20,27 +21,39 @@ impl Backup {
         Backup()
     }
 
-    fn wrapped_exec(&self, _matches: &ArgMatches) -> Result<(), Error> {
-        let scanner = Scanner::new();
-        let current_tree = scanner.scan("./sample-target")?;
+    fn wrapped_exec(&self, _matches: &ArgMatches) -> Result<()> {
+        let target_dir = PathBuf::from("./sample-target");
 
-        let save_path: PathBuf = "./last_scan.json".into();
-        if save_path.exists() {
-            let prev_tree = load_fs_tree(&save_path)?;
+        let repo_dir = PathBuf::from("./sample-repo");
+        ensure_dir(&repo_dir)?;
 
-            if current_tree == prev_tree {
-                println!("Not modified.");
-            } else {
-                println!("Detect modified.");
-            }
-        } else {
-            println!("No previous save.")
-        }
+        let object_dir = repo_dir.join("objects");
+        ensure_dir(&object_dir)?;
 
-        save_fs_tree(&save_path, &current_tree)?;
+        let scanner = Scanner::new("./sample-repo/objects");
+        let (current_hash, recorded_at) = scanner.scan(target_dir)?;
+
+        eprintln!("current_hash = {}", current_hash);
+        eprintln!("recorded_at = {}", recorded_at);
+
+        let history_dir = repo_dir.join("history");
+        ensure_dir(&history_dir)?;
+
+        let history_file = history_dir.join(&recorded_at.to_string());
+        fs::write(&history_file, &current_hash.to_string())?;
+
+        let last_scan_file = history_dir.join("last_scan");
+        fs::write(&last_scan_file, &recorded_at.to_string())?;
 
         Ok(())
     }
+}
+
+fn ensure_dir(path: &Path) -> Result<()> {
+    if ! path.exists() {
+        fs::create_dir(path)?;
+    }
+    Ok(())
 }
 
 impl SubCmd for Backup {
@@ -60,38 +73,34 @@ impl SubCmd for Backup {
                 if cfg!(debug_assertions) {
                     eprintln!("{:#?}", e);
                 }
-                std::process::exit(1)
+                exit(1)
             }
         }
     }
 }
 
+type Result<T> = std::result::Result<T, Error>;
+
 #[derive(Debug, Fail)]
 pub enum Error {
     // #[fail(display = "Found invalid command-line argument: {}", msg)]
     // InvalidArg { msg: &'static str },
+
+    #[fail(display = "failed scan with IO error: {}", _0)]
+    IO(#[fail(cause)] io::Error),
+
     #[fail(display = "file scan error: {}", _0)]
     Scan(#[fail(cause)] scan::Error),
-    #[fail(display = "failed load last scan data: {}", _0)]
-    Load(#[fail(cause)] LoadError),
-    #[fail(display = "failed save scan data: {}", _0)]
-    Save(#[fail(cause)] SaveError),
+}
+
+impl From<io::Error> for Error {
+    fn from(e: io::Error) -> Error {
+        Error::IO(e)
+    }
 }
 
 impl From<scan::Error> for Error {
     fn from(e: scan::Error) -> Error {
         Error::Scan(e)
-    }
-}
-
-impl From<LoadError> for Error {
-    fn from(e: LoadError) -> Error {
-        Error::Load(e)
-    }
-}
-
-impl From<SaveError> for Error {
-    fn from(e: SaveError) -> Error {
-        Error::Save(e)
     }
 }
