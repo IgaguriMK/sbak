@@ -1,14 +1,14 @@
 use std::io;
-use std::process::exit;
 use std::path::PathBuf;
+use std::process::exit;
 
 use clap::{App, ArgMatches, SubCommand};
 use failure::Fail;
 
 use super::SubCmd;
 
-use crate::core::scan::{self, Scanner};
 use crate::core::repo::{self, Repository};
+use crate::core::scan::{self, Scanner};
 
 pub fn new() -> Box<dyn SubCmd> {
     Box::new(Backup::new())
@@ -27,16 +27,9 @@ impl Backup {
         let repo_dir = PathBuf::from("./sample-repo");
         let repo = Repository::open_or_create(&repo_dir)?;
 
-        let object_dir = repo.object_dir();
-
-        let scanner = Scanner::new(object_dir);
-        let (current_hash, recorded_at) = scanner.scan(target_dir)?;
-
-        eprintln!("current_hash = {}", current_hash);
-        eprintln!("recorded_at = {}", recorded_at);
-
         let bank = repo.open_bank("sample");
-        bank.save_history(current_hash, recorded_at)?;
+        let scanner = Scanner::new(bank);
+        scanner.scan(target_dir)?;
 
         Ok(())
     }
@@ -71,7 +64,6 @@ type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     // #[fail(display = "Found invalid command-line argument: {}", msg)]
     // InvalidArg { msg: &'static str },
-
     #[fail(display = "failed scan with IO error: {}", _0)]
     IO(#[fail(cause)] io::Error),
 

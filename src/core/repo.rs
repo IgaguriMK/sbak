@@ -17,7 +17,7 @@ pub struct Repository {
 }
 
 impl Repository {
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Repository> {
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Repository, Error> {
         let repo = Repository::new(path);
 
         check_path(&repo.path, "repository directory")?;
@@ -27,7 +27,7 @@ impl Repository {
         Ok(repo)
     }
 
-    pub fn open_or_create<P: AsRef<Path>>(path: P) -> Result<Repository> {
+    pub fn open_or_create<P: AsRef<Path>>(path: P) -> Result<Repository, Error> {
         let repo = Repository::new(path);
 
         ensure_dir(&repo.path)?;
@@ -54,12 +54,35 @@ impl Repository {
         Bank::new(self, bank_dir)
     }
 
-    pub fn object_dir(&self) -> &Path {
+    fn save_object(&self, id: HashID, mut temp: fs::File) -> Result<(), io::Error> {
+        let out_path = self.object_path(id);
+
+        let out_dir = out_path.parent().unwrap();
+        fs::create_dir_all(out_dir)?;
+
+        let mut f = fs::File::create(&out_path)?;
+        io::copy(&mut temp, &mut f)?;
+
+        Ok(())
+    }
+
+    fn object_path(&self, id: HashID) -> PathBuf {
+        let mut res = self.object_dir().to_owned();
+
+        let (p0, p1, p2) = id.parts();
+        res.push(p0);
+        res.push(p1);
+        res.push(p2);
+
+        res
+    }
+
+    fn object_dir(&self) -> &Path {
         &self.objects_dir
     }
 }
 
-fn check_path(path: &Path, name: &'static str) -> Result<()> {
+fn check_path(path: &Path, name: &'static str) -> Result<(), Error> {
     if !path.exists() {
         Err(Error::IncompleteRepo(name, "missing"))
     } else if fs::metadata(path)?.permissions().readonly() {
@@ -80,7 +103,11 @@ impl<'a> Bank<'a> {
         Bank { repo, path }
     }
 
-    pub fn save_history(&self, id: HashID, timestamp: Timestamp) -> Result<()> {
+    pub fn save_object(&self, id: HashID, temp: fs::File) -> Result<(), io::Error> {
+        self.repo.save_object(id, temp)
+    }
+
+    pub fn save_history(&self, id: HashID, timestamp: Timestamp) -> Result<(), io::Error> {
         let history_dir = self.history_dir();
         ensure_dir(&history_dir)?;
 
@@ -92,7 +119,7 @@ impl<'a> Bank<'a> {
         Ok(())
     }
 
-    fn save_last_scan(&self, last_scan: &LastScan) -> Result<()> {
+    fn save_last_scan(&self, last_scan: &LastScan) -> Result<(), io::Error> {
         let last_scan_file = self.last_scan_file();
 
         let f = fs::File::create(&last_scan_file)?;
@@ -116,22 +143,19 @@ struct LastScan {
     id: HashID,
 }
 
-fn ensure_dir(path: &Path) -> Result<()> {
+fn ensure_dir(path: &Path) -> Result<(), io::Error> {
     if !path.exists() {
         fs::create_dir_all(path)?;
     }
     Ok(())
 }
 
-pub type Result<T> = std::result::Result<T, Error>;
-
-/// ファイルシステムのスキャンで発生しうるエラー
 #[derive(Debug, Fail)]
 pub enum Error {
     #[fail(display = "failed scan with IO error: {}", _0)]
     IO(#[fail(cause)] io::Error),
 
-    #[fail(display = "failed encode/parse: {}", _0)]
+    #[fail(display = "failed parse: {}", _0)]
     Serde(#[fail(cause)] serde_json::Error),
 
     #[fail(display = "repository isn't complete: {} is {}", _0, _1)]

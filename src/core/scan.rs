@@ -9,21 +9,21 @@ use failure::Fail;
 use serde_json::to_writer;
 
 use crate::core::entry::*;
-use crate::core::hash::{self, hash_reader, HashID};
+use crate::core::hash::{self, hash_reader};
+use crate::core::repo::Bank;
 use crate::core::timestamp::{self, Timestamp};
 
-
-#[derive(Debug, Clone)]
-pub struct Scanner {
+#[derive(Debug)]
+pub struct Scanner<'a> {
     last_scan: Timestamp,
-    object_dir: PathBuf,
+    bank: Bank<'a>,
 }
 
-impl Scanner {
-    pub fn new<P: AsRef<Path>>(object_dir: P) -> Scanner {
+impl<'a> Scanner<'a> {
+    pub fn new(bank: Bank<'a>) -> Scanner {
         Scanner {
             last_scan: Timestamp::default(),
-            object_dir: object_dir.as_ref().to_owned(),
+            bank,
         }
     }
 
@@ -31,11 +31,13 @@ impl Scanner {
         self.last_scan = timestamp;
     }
 
-    pub fn scan<P: AsRef<Path>>(&self, p: P) -> Result<(HashID, Timestamp)> {
+    pub fn scan<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let scan_start = Timestamp::now()?;
 
-        let p = p.as_ref();
-        Ok((self.scan_i(p)?.id(), scan_start))
+        let id = self.scan_i(path.as_ref())?;
+        self.bank.save_history(id.id(), scan_start)?;
+
+        Ok(())
     }
 
     fn scan_i(&self, p: &Path) -> Result<FsHash> {
@@ -69,7 +71,7 @@ impl Scanner {
         let (id, temp) = hash_reader(encoded.as_slice())?;
         entry.set_id(id.clone());
 
-        self.save_object(id, temp)?;
+        self.bank.save_object(id, temp)?;
 
         Ok(FsHash::try_from(entry).unwrap())
     }
@@ -81,32 +83,9 @@ impl Scanner {
         let (id, temp) = hash_reader(f)?;
         entry.set_id(id.clone());
 
-        self.save_object(id, temp)?;
+        self.bank.save_object(id, temp)?;
 
         Ok(FsHash::try_from(entry).unwrap())
-    }
-
-    fn save_object(&self, id: HashID, mut temp: fs::File) -> Result<()> {
-        let out_path = self.object_path(id);
-
-        let out_dir = out_path.parent().unwrap();
-        fs::create_dir_all(out_dir)?;
-
-        let mut f = fs::File::create(&out_path)?;
-        io::copy(&mut temp, &mut f)?;
-
-        Ok(())
-    }
-
-    fn object_path(&self, id: HashID) -> PathBuf {
-        let mut res = self.object_dir.clone();
-
-        let (p0, p1, p2) = id.parts();
-        res.push(p0);
-        res.push(p1);
-        res.push(p2);
-
-        res
     }
 }
 

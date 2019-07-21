@@ -1,9 +1,9 @@
-use std::time::{SystemTime, SystemTimeError, UNIX_EPOCH};
 use std::convert::TryFrom;
 use std::fmt;
+use std::time::{SystemTime, SystemTimeError, UNIX_EPOCH};
 
-use serde::{Serialize, Deserialize};
 use failure::Fail;
+use serde::{Deserialize, Serialize};
 
 /// ファイルの更新日時
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
