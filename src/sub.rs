@@ -40,6 +40,8 @@ impl<'a> SubCommandSet {
     }
 
     fn append(&mut self, subcmd: Box<dyn SubCmd>) {
-        self.table.insert(subcmd.name().to_owned(), subcmd);
+        if let Some(exists) = self.table.insert(subcmd.name().to_owned(), subcmd) {
+            panic!("registering duplecated subcommand: {}", exists.name());
+        }
     }
 }
