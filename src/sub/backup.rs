@@ -1,7 +1,6 @@
 use std::io;
-use std::fs;
 use std::process::exit;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use clap::{App, ArgMatches, SubCommand};
 use failure::Fail;
@@ -9,6 +8,7 @@ use failure::Fail;
 use super::SubCmd;
 
 use crate::core::scan::{self, Scanner};
+use crate::core::repo::{self, Repository};
 
 pub fn new() -> Box<dyn SubCmd> {
     Box::new(Backup::new())
@@ -25,35 +25,21 @@ impl Backup {
         let target_dir = PathBuf::from("./sample-target");
 
         let repo_dir = PathBuf::from("./sample-repo");
-        ensure_dir(&repo_dir)?;
+        let repo = Repository::open_or_create(&repo_dir)?;
 
-        let object_dir = repo_dir.join("objects");
-        ensure_dir(&object_dir)?;
+        let object_dir = repo.object_dir();
 
-        let scanner = Scanner::new("./sample-repo/objects");
+        let scanner = Scanner::new(object_dir);
         let (current_hash, recorded_at) = scanner.scan(target_dir)?;
 
         eprintln!("current_hash = {}", current_hash);
         eprintln!("recorded_at = {}", recorded_at);
 
-        let history_dir = repo_dir.join("history");
-        ensure_dir(&history_dir)?;
-
-        let history_file = history_dir.join(&recorded_at.to_string());
-        fs::write(&history_file, &current_hash.to_string())?;
-
-        let last_scan_file = history_dir.join("last_scan");
-        fs::write(&last_scan_file, &recorded_at.to_string())?;
+        let bank = repo.open_bank("sample");
+        bank.save_history(current_hash, recorded_at)?;
 
         Ok(())
     }
-}
-
-fn ensure_dir(path: &Path) -> Result<()> {
-    if ! path.exists() {
-        fs::create_dir(path)?;
-    }
-    Ok(())
 }
 
 impl SubCmd for Backup {
@@ -91,6 +77,9 @@ pub enum Error {
 
     #[fail(display = "file scan error: {}", _0)]
     Scan(#[fail(cause)] scan::Error),
+
+    #[fail(display = "repository operation error: {}", _0)]
+    Repo(#[fail(cause)] repo::Error),
 }
 
 impl From<io::Error> for Error {
@@ -102,5 +91,11 @@ impl From<io::Error> for Error {
 impl From<scan::Error> for Error {
     fn from(e: scan::Error) -> Error {
         Error::Scan(e)
+    }
+}
+
+impl From<repo::Error> for Error {
+    fn from(e: repo::Error) -> Error {
+        Error::Repo(e)
     }
 }
