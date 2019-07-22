@@ -1,5 +1,6 @@
 //! サブコマンドの基盤部分
 
+use std::fmt;
 use std::collections::BTreeMap;
 
 use clap::{App, ArgMatches};
@@ -30,7 +31,7 @@ pub fn sub_commands() -> SubCommandSet {
 }
 
 /// サブコマンドの一覧を表現する
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct SubCommandSet {
     table: BTreeMap<String, Box<dyn SubCmd>>,
 }
@@ -63,5 +64,11 @@ impl<'a> SubCommandSet {
         if let Some(exists) = self.table.insert(subcmd.name().to_owned(), subcmd) {
             panic!("registering duplecated subcommand: {}", exists.name());
         }
+    }
+}
+
+impl fmt::Debug for SubCommandSet {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_set().entries(self.table.keys()).finish()
     }
 }
