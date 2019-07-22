@@ -12,10 +12,14 @@ use tempfile::tempfile;
 
 const BUFFER_SIZE: usize = 4096;
 
+/// エントリのSHA3-256ハッシュID
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct HashID(String);
 
 impl HashID {
+    /// ハッシュ値の文字列表現を4-4-56文字に分割して返す。
+    /// 
+    /// リポジトリでの保存先ディレクトリの階層化に使われる。
     pub fn parts(&self) -> (&str, &str, &str) {
         let s = self.0.as_str();
         (&s[0..4], &s[4..8], &s[8..])
@@ -28,6 +32,7 @@ impl fmt::Display for HashID {
     }
 }
 
+/// `r`から内容を一時ファイルにコピーしつつ、ハッシュ値を計算する。
 pub fn hash_reader<R: Read>(mut r: R) -> Result<(HashID, File)> {
     let mut hasher = Sha3_256::new();
     let mut temp = tempfile()?;
@@ -36,7 +41,6 @@ pub fn hash_reader<R: Read>(mut r: R) -> Result<(HashID, File)> {
     loop {
         let read_size = r.read(&mut buffer)?;
         if read_size == 0 {
-            // End of input (due to BUFFER_SIZE > 0)
             break;
         }
         let bytes = &buffer[..read_size];
@@ -46,18 +50,20 @@ pub fn hash_reader<R: Read>(mut r: R) -> Result<(HashID, File)> {
     }
 
     temp.flush()?;
-    temp.seek(SeekFrom::Start(0))?; // Seek to start of tempfile
+    temp.seek(SeekFrom::Start(0))?; // 読み込みに備えてファイル先頭に巻き戻しておく
 
     let hash = HashID(encode(hasher.result()));
 
     Ok((hash, temp))
 }
 
+#[allow(missing_docs)]
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// ファイルシステムのスキャンで発生しうるエラー
 #[derive(Debug, Fail)]
 pub enum Error {
+    /// 入出力エラーが発生した
     #[fail(display = "failed scan with IO error: {}", _0)]
     IO(#[fail(cause)] io::Error),
 }

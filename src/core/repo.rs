@@ -111,6 +111,7 @@ fn check_path(path: &Path, name: &'static str) -> Result<(), Error> {
     }
 }
 
+/// バックアップ元に対応した履歴の保存先を表す型
 #[derive(Debug)]
 pub struct Bank<'a> {
     repo: &'a Repository,
@@ -122,10 +123,12 @@ impl<'a> Bank<'a> {
         Bank { repo, path }
     }
 
-    pub fn save_object(&self, id: HashID, temp: fs::File) -> Result<(), io::Error> {
-        self.repo.save_object(id, temp)
+    /// ファイルを指定された`id`のオブジェクトとして保存する。
+    pub fn save_object(&self, id: HashID, file: fs::File) -> Result<(), io::Error> {
+        self.repo.save_object(id, file)
     }
 
+    /// スキャン結果のエンティティのIDを`timestamp`時点での履歴として保存する。
     pub fn save_history(&self, id: HashID, timestamp: Timestamp) -> Result<(), io::Error> {
         let history_dir = self.history_dir();
         ensure_dir(&history_dir)?;
@@ -169,14 +172,14 @@ fn ensure_dir(path: &Path) -> Result<(), io::Error> {
     Ok(())
 }
 
+/// リポジトリ操作に関わるエラー
 #[derive(Debug, Fail)]
 pub enum Error {
+    /// 入出力エラーが発生した
     #[fail(display = "failed scan with IO error: {}", _0)]
     IO(#[fail(cause)] io::Error),
 
-    #[fail(display = "failed parse: {}", _0)]
-    Serde(#[fail(cause)] serde_json::Error),
-
+    /// リポジトリが不完全な状態である
     #[fail(display = "repository isn't complete: {} is {}", _0, _1)]
     IncompleteRepo(&'static str, &'static str),
 }
@@ -184,11 +187,5 @@ pub enum Error {
 impl From<io::Error> for Error {
     fn from(e: io::Error) -> Error {
         Error::IO(e)
-    }
-}
-
-impl From<serde_json::Error> for Error {
-    fn from(e: serde_json::Error) -> Error {
-        Error::Serde(e)
     }
 }

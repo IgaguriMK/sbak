@@ -14,6 +14,7 @@ use crate::core::hash::{self, hash_reader};
 use crate::core::repo::Bank;
 use crate::core::timestamp::{self, Timestamp};
 
+/// 更新されたファイルやディレクトリをスキャンするスキャナ
 #[derive(Debug)]
 pub struct Scanner<'a> {
     last_scan: Timestamp,
@@ -21,6 +22,7 @@ pub struct Scanner<'a> {
 }
 
 impl<'a> Scanner<'a> {
+    /// 指定された`Bank`に保存する、デフォルト設定のスキャナを生成する
     pub fn new(bank: Bank<'a>) -> Scanner {
         Scanner {
             last_scan: Timestamp::default(),
@@ -28,10 +30,7 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    pub fn set_last_scan(&mut self, timestamp: Timestamp) {
-        self.last_scan = timestamp;
-    }
-
+    /// 指定ディレクトリをスキャンする
     pub fn scan<P: AsRef<Path>>(self, path: P) -> Result<()> {
         let scan_start = Timestamp::now()?;
 
@@ -105,26 +104,29 @@ fn convert_metadata(path: &Path, fs_meta: &fs::Metadata) -> Result<Attributes> {
     }
 }
 
+#[allow(missing_docs)]
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// ファイルシステムのスキャンで発生しうるエラー
 #[derive(Debug, Fail)]
 pub enum Error {
+    /// エントリのJSONへのエンコードの失敗
     #[fail(display = "failed parse FsEntry: {}", _0)]
     Encode(#[fail(cause)] serde_json::Error),
 
+    /// 入出力エラー
     #[fail(display = "failed scan with IO error: {}", _0)]
     IO(#[fail(cause)] io::Error),
 
+    /// 名前が空文字列である要素を発見した
     #[fail(display = "found empty name entry at {:?}", _0)]
     NameIsEmpty(PathBuf),
 
+    /// パスがUnicodeで表現できない
     #[fail(display = "found empty name entry at {:?}", _0)]
     NameIsInvalidUnicode(PathBuf),
 
-    #[fail(display = "path is out of base path: {:?}", _0)]
-    OutOfBaseDir(PathBuf),
-
+    /// 対応範囲外のタイムスタンプを検出
     #[fail(display = "timestamp is older than UNIX epoch")]
     Timestamp,
 }

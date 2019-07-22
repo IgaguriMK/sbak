@@ -8,7 +8,7 @@ use failure::Fail;
 use serde::{Deserialize, Serialize};
 
 /// 秒精度のタイムスタンプ
-/// 
+///
 /// [`std::time::SystemTime`](https://doc.rust-lang.org/std/time/struct.SystemTime.html) 由来の時刻をUNIX epochからの経過秒数で管理する。
 /// UNIX epochより古い時刻には対応していない。
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -16,9 +16,9 @@ pub struct Timestamp(u64);
 
 impl Timestamp {
     /// 現在時刻を取得する
-    /// 
+    ///
     /// # Failures
-    /// 
+    ///
     /// システムの現在時刻がUNIX epoch (`1970-01-01 00:00:00 UTC`) より前である場合、 [`Error::NegativeUnixTime`](enum.Error.html) を返す。
     pub fn now() -> Result<Timestamp> {
         Timestamp::try_from(SystemTime::now())
@@ -40,8 +40,10 @@ impl fmt::Display for Timestamp {
     }
 }
 
+#[allow(missing_docs)]
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// タイムスタンプ操作に関わるエラー
 #[derive(Debug, Fail)]
 pub enum Error {
     /// 対象日時のUNIX epochが負になっている
