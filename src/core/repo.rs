@@ -1,3 +1,5 @@
+//! バックアップ先となるリポジトリの操作
+
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -9,6 +11,9 @@ use serde_json::{self, to_writer};
 use crate::core::hash::HashID;
 use crate::core::timestamp::Timestamp;
 
+/// バックアップ先となるリポジトリのディレクトリを管理する型。
+///
+/// リポジトリは共通のファイル本体を格納する`objects`ディレクトリと、`banks`以下にバックアップ元ごとに対応した[`Bank`](struct.Bank.html)を0個以上持つ。
 #[derive(Debug)]
 pub struct Repository {
     path: PathBuf,
@@ -17,7 +22,13 @@ pub struct Repository {
 }
 
 impl Repository {
+    /// 既存のリポジトリを開く。
+    /// 
+    /// # Failures
+    /// 
+    /// 必須のリポジトリとして必要なルートディレクトリ、`objects`ディレクトリ、`banks`ディレクトリのどれかが存在しないか書き込み不可能な場合、[`Error::IncompleteRepo`](enum.Error.html)を返す。
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Repository, Error> {
+        // TODO: Readonlyでも読み込み用に開けるようにする。
         let repo = Repository::new(path);
 
         check_path(&repo.path, "repository directory")?;
@@ -27,7 +38,13 @@ impl Repository {
         Ok(repo)
     }
 
+    /// 既存のリポジトリを開くか、存在しない場合生成する。
+    /// 
+    /// # Failures
+    /// 
+    /// ディレクトリが存在せず、生成も失敗した場合、[`Error::IO`](enum.Error.html)を返す。
     pub fn open_or_create<P: AsRef<Path>>(path: P) -> Result<Repository, Error> {
+        // TODO: 読み込み専用の場合エラーにする。
         let repo = Repository::new(path);
 
         ensure_dir(&repo.path)?;
@@ -37,6 +54,7 @@ impl Repository {
         Ok(repo)
     }
 
+    // ディレクトリの存在を保証するため、`new`は内部専用。
     fn new<P: AsRef<Path>>(path: P) -> Repository {
         let path = path.as_ref().to_owned();
         let objects_dir = path.join("objects");
@@ -49,6 +67,7 @@ impl Repository {
         }
     }
 
+    /// 指定された名前の[`Bank`](struct.Bank.html)を開く。
     pub fn open_bank<'a>(&'a self, name: &str) -> Bank<'a> {
         let bank_dir = self.banks_dir.join(name);
         Bank::new(self, bank_dir)

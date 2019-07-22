@@ -1,15 +1,26 @@
+//! サブコマンドの基盤部分
+
 use std::collections::BTreeMap;
 
 use clap::{App, ArgMatches};
 
 mod backup;
 
+/// サブコマンドを表現するトレイト
 pub trait SubCmd {
+    /// サブコマンドの名前を返す。
     fn name(&self) -> &'static str;
+
+    /// コマンドライン引数の定義を返す。
     fn command_args(&self) -> App<'static, 'static>;
+
+    /// サブコマンドを実行する。
+    ///
+    /// 完了後は制御を返さず、 [`std::process::exit`](https://doc.rust-lang.org/std/process/fn.exit.html) などでプロセスを終了する。
     fn exec(&self, matches: &ArgMatches) -> !;
 }
 
+/// 組み込まれているサブコマンドすべてを含む [`SubCommandSet`](struct.SubCommandSet.html) を返す。
 pub fn sub_commands() -> SubCommandSet {
     let mut set = SubCommandSet::new();
 
@@ -18,28 +29,37 @@ pub fn sub_commands() -> SubCommandSet {
     set
 }
 
+/// サブコマンドの一覧を表現する
+#[derive(Debug, Default)]
 pub struct SubCommandSet {
     table: BTreeMap<String, Box<dyn SubCmd>>,
 }
 
 impl<'a> SubCommandSet {
-    fn new() -> SubCommandSet {
+    /// 空の一覧を返す。
+    pub fn new() -> SubCommandSet {
         SubCommandSet {
             table: BTreeMap::new(),
         }
     }
 
+    /// clapで使用するサブコマンドの定義リストを返す。
     pub fn arg_defs(&'a self) -> impl Iterator<Item = App<'a, 'a>> {
         self.table.iter().map(|(_, c)| c.command_args())
     }
 
+    /// サブコマンド `name` を起動する。
+    ///
+    /// `name` が一致したサブコマンドがある場合、 [`SubCmd::exec`](trait.SubCmd.html#tymethod.exec) が実行されるため制御は返らない。
+    /// 制御が返った場合、一致するサブコマンドは存在しない。
     pub fn execute(&self, name: &str, matches: &ArgMatches) {
         if let Some(cmd) = self.table.get(name) {
             cmd.exec(matches);
         }
     }
 
-    fn append(&mut self, subcmd: Box<dyn SubCmd>) {
+    /// サブコマンドを追加する。
+    pub fn append(&mut self, subcmd: Box<dyn SubCmd>) {
         if let Some(exists) = self.table.insert(subcmd.name().to_owned(), subcmd) {
             panic!("registering duplecated subcommand: {}", exists.name());
         }

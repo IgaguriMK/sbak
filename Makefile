@@ -32,11 +32,11 @@ check: soft-clean
 	cargo clippy -- -D warnings
 
 .PHONY: doc
-doc: check
+doc:
 	cargo doc $(DOC_OPTION)
 
 .PHONY: doc-open
-doc-open: check
+doc-open:
 	cargo doc $(DOC_OPTION) --open
 
 .PHONY: release
