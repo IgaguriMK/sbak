@@ -68,6 +68,8 @@ impl Entry for FsEntry {
 /// ディレクトリの各種情報
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DirEntry {
+    #[serde(skip_serializing)]
+    #[serde(default)]
     id: Option<HashID>,
     attr: Attributes,
     childlen: Vec<FsHash>,
@@ -122,6 +124,8 @@ impl DirEntryBuilder {
 /// ファイルの各種情報
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FileEntry {
+    #[serde(skip_serializing)]
+    #[serde(default)]
     id: Option<HashID>,
     attr: Attributes,
 }
