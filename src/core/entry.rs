@@ -5,12 +5,13 @@ use std::path::{Path, PathBuf};
 
 use failure::Fail;
 use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
 
 use crate::core::hash::HashID;
 use crate::core::timestamp::Timestamp;
 
 /// ファイルシステムの1エントリの表現
-pub trait Entry {
+pub trait Entry: Serialize + DeserializeOwned {
     /// ハッシュ値によるIDを返す
     fn id(&self) -> Option<HashID>;
     /// IDを設定する

@@ -2,7 +2,7 @@
 
 use std::fmt;
 use std::fs::File;
-use std::io::{self, Read, Seek, SeekFrom, Write};
+use std::io::{self, copy, Read, Seek, SeekFrom, Write};
 
 use failure::Fail;
 use hex::encode;
@@ -30,6 +30,17 @@ impl fmt::Display for HashID {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
     }
+}
+
+/// ファイルのハッシュ値を計算する。
+/// 
+/// ファイル`f`は一旦最後まで読み込まれた後、シーク位置が先頭に巻き戻される。
+pub fn hash(f: &mut File) -> Result<HashID> {
+    let mut hasher = Sha3_256::new();
+    copy(f, &mut hasher)?;
+    f.seek(SeekFrom::Start(0))?;
+
+    Ok(HashID(encode(hasher.result())))
 }
 
 /// `r`から内容を一時ファイルにコピーしつつ、ハッシュ値を計算する。
