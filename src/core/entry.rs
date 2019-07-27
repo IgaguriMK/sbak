@@ -9,18 +9,24 @@ use serde::{Deserialize, Serialize};
 use crate::core::hash::HashID;
 use crate::core::timestamp::Timestamp;
 
+/// ファイルシステムの1エントリの表現
 pub trait Entry {
+    /// ハッシュ値によるIDを返す
     fn id(&self) -> Option<HashID>;
+    /// IDを設定する
     fn set_id(&mut self, id: HashID);
+    /// このエントリのパスを返す
     fn path(&self, parent: &Path) -> PathBuf;
 }
 
-/// ファイルシステムの1エントリの表現
+/// エントリの実表現
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FsEntry {
-    #[serde(rename = "d")]
+    /// ディレクトリ
+    #[serde(rename = "dir")]
     Dir(DirEntry),
-    #[serde(rename = "f")]
+    /// ファイル
+    #[serde(rename = "file")]
     File(FileEntry),
 }
 
@@ -62,11 +68,8 @@ impl Entry for FsEntry {
 /// ディレクトリの各種情報
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DirEntry {
-    #[serde(rename = "id")]
     id: Option<HashID>,
-    #[serde(rename = "a")]
     attr: Attributes,
-    #[serde(rename = "ch")]
     childlen: Vec<FsHash>,
 }
 
@@ -84,12 +87,14 @@ impl Entry for DirEntry {
     }
 }
 
+/// [`DirEntry`](struct.DirEntry.html)のBuilder
 pub struct DirEntryBuilder {
     attr: Attributes,
     childlen: Vec<FsHash>,
 }
 
 impl DirEntryBuilder {
+    /// 新たなBuilderを生成する。
     pub fn new(attr: Attributes) -> DirEntryBuilder {
         DirEntryBuilder {
             attr,
@@ -97,10 +102,12 @@ impl DirEntryBuilder {
         }
     }
 
+    /// 子エントリのIDを追加する。
     pub fn append(&mut self, ch: FsHash) {
         self.childlen.push(ch);
     }
 
+    /// 正規化された[`DirEntry`](struct.DirEntry.html)を取得する。
     pub fn build(mut self) -> DirEntry {
         self.childlen.sort();
 
@@ -115,13 +122,12 @@ impl DirEntryBuilder {
 /// ファイルの各種情報
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FileEntry {
-    #[serde(rename = "id")]
     id: Option<HashID>,
-    #[serde(rename = "a")]
     attr: Attributes,
 }
 
 impl FileEntry {
+    /// 新たなファイルエントリを生成する。
     pub fn new(attr: Attributes) -> FileEntry {
         FileEntry { id: None, attr }
     }
@@ -144,15 +150,13 @@ impl Entry for FileEntry {
 /// ファイルやディレクトリの属性
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Attributes {
-    #[serde(rename = "n")]
     name: String,
-    #[serde(rename = "r")]
     readonly: bool,
-    #[serde(rename = "mod")]
     modified: Timestamp,
 }
 
 impl Attributes {
+    /// Attributesを生成する。
     pub fn new(name: String, readonly: bool, modified: Timestamp) -> Attributes {
         Attributes {
             name,
@@ -162,15 +166,19 @@ impl Attributes {
     }
 }
 
+/// エントリのハッシュ値と属性
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[allow(missing_docs)]
+#[serde(tag="type")]
 pub enum FsHash {
-    #[serde(rename = "d")]
+    #[serde(rename = "dir")]
     Dir { attr: Attributes, id: HashID },
-    #[serde(rename = "f")]
+    #[serde(rename = "file")]
     File { attr: Attributes, id: HashID },
 }
 
 impl FsHash {
+    /// ハッシュ値を取得する
     pub fn id(&self) -> HashID {
         match self {
             FsHash::Dir { id, .. } => id.clone(),
@@ -203,8 +211,10 @@ impl TryFrom<FileEntry> for FsHash {
     }
 }
 
+/// エントリの`FsHash`への変換で発生しうるエラー
 #[derive(Debug, Fail)]
 pub enum NoIdError {
+    /// IDが未設定である
     #[fail(display = "entry id isn't calculated")]
     NoId,
 }
