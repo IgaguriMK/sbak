@@ -73,7 +73,7 @@ impl Repository {
         Bank::new(self, bank_dir)
     }
 
-    fn save_object(&self, id: HashID, mut temp: fs::File) -> Result<(), io::Error> {
+    fn save_object(&self, id: &HashID, mut temp: fs::File) -> Result<(), io::Error> {
         let out_path = self.object_path(id);
 
         let out_dir = out_path.parent().unwrap();
@@ -85,7 +85,7 @@ impl Repository {
         Ok(())
     }
 
-    fn object_path(&self, id: HashID) -> PathBuf {
+    fn object_path(&self, id: &HashID) -> PathBuf {
         let mut res = self.object_dir().to_owned();
 
         let (p0, p1, p2) = id.parts();
@@ -124,7 +124,7 @@ impl<'a> Bank<'a> {
     }
 
     /// ファイルを指定された`id`のオブジェクトとして保存する。
-    pub fn save_object(&self, id: HashID, file: fs::File) -> Result<(), io::Error> {
+    pub fn save_object(&self, id: &HashID, file: fs::File) -> Result<(), io::Error> {
         self.repo.save_object(id, file)
     }
 

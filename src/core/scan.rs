@@ -69,9 +69,9 @@ impl<'a> Scanner<'a> {
         to_writer(&mut encoded, &entry)?;
 
         let (id, temp) = hash_reader(encoded.as_slice())?;
-        entry.set_id(id.clone());
+        self.bank.save_object(&id, temp)?;
 
-        self.bank.save_object(id, temp)?;
+        entry.set_id(id.clone());
 
         Ok(FsHash::try_from(entry).unwrap())
     }
@@ -81,9 +81,9 @@ impl<'a> Scanner<'a> {
 
         let f = fs::File::open(p)?;
         let (id, temp) = hash_reader(f)?;
-        entry.set_id(id.clone());
+        self.bank.save_object(&id, temp)?;
 
-        self.bank.save_object(id, temp)?;
+        entry.set_id(id.clone());
 
         Ok(FsHash::try_from(entry).unwrap())
     }
