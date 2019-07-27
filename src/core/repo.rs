@@ -23,9 +23,9 @@ pub struct Repository {
 
 impl Repository {
     /// 既存のリポジトリを開く。
-    /// 
+    ///
     /// # Failures
-    /// 
+    ///
     /// 必須のリポジトリとして必要なルートディレクトリ、`objects`ディレクトリ、`banks`ディレクトリのどれかが存在しないか書き込み不可能な場合、[`Error::IncompleteRepo`](enum.Error.html)を返す。
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Repository, Error> {
         // TODO: Readonlyでも読み込み用に開けるようにする。
@@ -39,9 +39,9 @@ impl Repository {
     }
 
     /// 既存のリポジトリを開くか、存在しない場合生成する。
-    /// 
+    ///
     /// # Failures
-    /// 
+    ///
     /// ディレクトリが存在せず、生成も失敗した場合、[`Error::IO`](enum.Error.html)を返す。
     pub fn open_or_create<P: AsRef<Path>>(path: P) -> Result<Repository, Error> {
         // TODO: 読み込み専用の場合エラーにする。
@@ -133,19 +133,15 @@ impl<'a> Bank<'a> {
         let history_dir = self.history_dir();
         ensure_dir(&history_dir)?;
 
+        let last_scan = LastScan { id, timestamp };
+
         let history_file = history_dir.join(&timestamp.to_string());
-        fs::write(&history_file, &id.to_string())?;
+        let f = fs::File::create(&history_file)?;
+        to_writer(f, &last_scan)?;
 
-        self.save_last_scan(&LastScan { id, timestamp })?;
-
-        Ok(())
-    }
-
-    fn save_last_scan(&self, last_scan: &LastScan) -> Result<(), io::Error> {
         let last_scan_file = self.last_scan_file();
-
         let f = fs::File::create(&last_scan_file)?;
-        to_writer(f, last_scan)?;
+        to_writer(f, &last_scan)?;
 
         Ok(())
     }
