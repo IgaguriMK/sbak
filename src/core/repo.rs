@@ -8,7 +8,7 @@ use failure::Fail;
 use serde::{Deserialize, Serialize};
 use serde_json::{self, from_reader, to_writer};
 
-use crate::core::entry::{DirEntry};
+use crate::core::entry::DirEntry;
 use crate::core::hash::{self, HashID};
 use crate::core::timestamp::Timestamp;
 
@@ -39,12 +39,12 @@ impl Repository {
         Ok(repo)
     }
 
-    /// 既存のリポジトリを開くか、存在しない場合生成する。
+    /// リポジトリを生成する。
     ///
     /// # Failures
     ///
-    /// ディレクトリが存在せず、生成も失敗した場合、[`Error::IO`](enum.Error.html)を返す。
-    pub fn open_or_create<P: AsRef<Path>>(path: P) -> Result<Repository, Error> {
+    /// 生成に失敗した場合、[`Error::IO`](enum.Error.html)を返す。
+    pub fn create<P: AsRef<Path>>(path: P) -> Result<Repository, Error> {
         // TODO: 読み込み専用の場合エラーにする。
         let repo = Repository::new(path);
 
@@ -70,8 +70,22 @@ impl Repository {
 
     /// 指定された名前の[`Bank`](struct.Bank.html)を開く。
     pub fn open_bank<'a>(&'a self, name: &str) -> Bank<'a> {
-        let bank_dir = self.banks_dir.join(name);
+        let bank_dir = self.bank_path(name);
         Bank::new(self, bank_dir)
+    }
+
+    /// 指定された名前の[`Bank`](struct.Bank.html)を作成する。
+    pub fn create_bank(&self, name: &str) -> Result<(), Error> {
+        let bank_dir = self.bank_path(name);
+        let bank = Bank::new(self, bank_dir);
+        bank.create_dir()?;
+        Ok(())
+    }
+
+    /// 指定された名前のbankがあるかどうかチェックする。
+    pub fn bank_exists(&self, name: &str) -> Result<bool, Error> {
+        let bank_dir = self.bank_path(name);
+        Ok(bank_dir.exists())
     }
 
     fn save_object(&self, id: &HashID, mut temp: fs::File) -> Result<(), io::Error> {
@@ -113,6 +127,10 @@ impl Repository {
         res.push(p2);
 
         res
+    }
+
+    fn bank_path(&self, name: &str) -> PathBuf {
+        self.banks_dir.join(name)
     }
 
     fn object_dir(&self) -> &Path {
@@ -177,14 +195,14 @@ impl<'a> Bank<'a> {
     }
 
     /// 指定された`id`のファイルを開く。
-    /// 
+    ///
     /// 内部でファイルの整合性チェックが行われる。
     pub fn open_object(&self, id: &HashID) -> Result<fs::File, Error> {
         self.repo.open_object(id)
     }
 
     /// 最新の履歴を得る。
-    /// 
+    ///
     /// 存在しない場合はNoneを返す。
     pub fn last_scan(&self) -> Result<Option<History>, Error> {
         let path = self.last_scan_file();
@@ -199,12 +217,18 @@ impl<'a> Bank<'a> {
         Ok(Some(history))
     }
 
+    fn create_dir(&self) -> Result<(), Error> {
+        ensure_dir(&self.path)?;
+        ensure_dir(&self.history_dir())?;
+        Ok(())
+    }
+
     fn history_dir(&self) -> PathBuf {
         self.path.join("history")
     }
 
     fn last_scan_file(&self) -> PathBuf {
-        self.history_dir().join("last_scan")
+        self.path.join("last_scan")
     }
 }
 

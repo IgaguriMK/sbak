@@ -7,6 +7,7 @@ use failure::Fail;
 
 use super::SubCmd;
 
+use crate::config::Config;
 use crate::core::repo::{self, Repository};
 use crate::core::scan::{self, Scanner};
 
@@ -21,11 +22,11 @@ impl Backup {
         Backup()
     }
 
-    fn wrapped_exec(&self, _matches: &ArgMatches) -> Result<()> {
+    fn wrapped_exec(&self, _matches: &ArgMatches, _config: Config) -> Result<()> {
         let target_dir = PathBuf::from("./sample-target");
 
         let repo_dir = PathBuf::from("./sample-repo");
-        let repo = Repository::open_or_create(&repo_dir)?;
+        let repo = Repository::open(&repo_dir)?;
 
         let bank = repo.open_bank("sample");
         let scanner = Scanner::new(bank);
@@ -40,12 +41,12 @@ impl SubCmd for Backup {
         "backup"
     }
 
-    fn command_args(&self) -> App<'static, 'static> {
+    fn command_args(&self) -> App {
         SubCommand::with_name(self.name()).about("Backup files")
     }
 
-    fn exec(&self, matches: &ArgMatches) -> ! {
-        match self.wrapped_exec(matches) {
+    fn exec(&self, matches: &ArgMatches, config: Config) -> ! {
+        match self.wrapped_exec(matches, config) {
             Ok(()) => exit(0),
             Err(e) => {
                 eprintln!("{}", e);
@@ -62,8 +63,6 @@ type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Fail)]
 pub enum Error {
-    // #[fail(display = "Found invalid command-line argument: {}", msg)]
-    // InvalidArg { msg: &'static str },
     #[fail(display = "failed scan with IO error: {}", _0)]
     IO(#[fail(cause)] io::Error),
 

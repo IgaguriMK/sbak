@@ -18,7 +18,7 @@ pub struct HashID(String);
 
 impl HashID {
     /// ハッシュ値の文字列表現を4-4-56文字に分割して返す。
-    /// 
+    ///
     /// リポジトリでの保存先ディレクトリの階層化に使われる。
     pub fn parts(&self) -> (&str, &str, &str) {
         let s = self.0.as_str();
@@ -33,7 +33,7 @@ impl fmt::Display for HashID {
 }
 
 /// ファイルのハッシュ値を計算する。
-/// 
+///
 /// ファイル`f`は一旦最後まで読み込まれた後、シーク位置が先頭に巻き戻される。
 pub fn hash(f: &mut File) -> Result<HashID> {
     let mut hasher = Sha3_256::new();

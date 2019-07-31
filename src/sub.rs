@@ -1,24 +1,28 @@
 //! サブコマンドの基盤部分
 
-use std::fmt;
 use std::collections::BTreeMap;
+use std::fmt;
 
 use clap::{App, ArgMatches};
 
+use crate::config::Config;
+
 mod backup;
+mod info;
+mod init;
 
 /// サブコマンドを表現するトレイト
 pub trait SubCmd {
     /// サブコマンドの名前を返す。
-    fn name(&self) -> &'static str;
+    fn name(&self) -> &str;
 
     /// コマンドライン引数の定義を返す。
-    fn command_args(&self) -> App<'static, 'static>;
+    fn command_args(&self) -> App;
 
     /// サブコマンドを実行する。
     ///
     /// 完了後は制御を返さず、 [`std::process::exit`](https://doc.rust-lang.org/std/process/fn.exit.html) などでプロセスを終了する。
-    fn exec(&self, matches: &ArgMatches) -> !;
+    fn exec(&self, matches: &ArgMatches, config: Config) -> !;
 }
 
 /// 組み込まれているサブコマンドすべてを含む [`SubCommandSet`](struct.SubCommandSet.html) を返す。
@@ -26,6 +30,8 @@ pub fn sub_commands() -> SubCommandSet {
     let mut set = SubCommandSet::new();
 
     set.append(backup::new());
+    set.append(init::new());
+    set.append(info::new());
 
     set
 }
@@ -53,9 +59,9 @@ impl<'a> SubCommandSet {
     ///
     /// `name` が一致したサブコマンドがある場合、 [`SubCmd::exec`](trait.SubCmd.html#tymethod.exec) が実行されるため制御は返らない。
     /// 制御が返った場合、一致するサブコマンドは存在しない。
-    pub fn execute(&self, name: &str, matches: &ArgMatches) {
+    pub fn execute(&self, name: &str, matches: &ArgMatches, config: Config) {
         if let Some(cmd) = self.table.get(name) {
-            cmd.exec(matches);
+            cmd.exec(matches, config);
         }
     }
 

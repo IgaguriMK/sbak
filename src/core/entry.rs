@@ -4,8 +4,8 @@ use std::convert::TryFrom;
 use std::path::{Path, PathBuf};
 
 use failure::Fail;
-use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 
 use crate::core::hash::HashID;
 use crate::core::timestamp::Timestamp;
@@ -174,7 +174,7 @@ impl Attributes {
 /// エントリのハッシュ値と属性
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[allow(missing_docs)]
-#[serde(tag="type")]
+#[serde(tag = "type")]
 pub enum FsHash {
     #[serde(rename = "dir")]
     Dir { attr: Attributes, id: HashID },
