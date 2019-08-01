@@ -28,13 +28,14 @@ impl Bank {
 
         let repository = Repository::open(&repo_path)?;
         let name = matches.value_of("name").unwrap();
+        let path = matches.value_of("path").unwrap();
 
         if repository.bank_exists(name)? {
             println!("bank '{}' already exists.", name);
             return Ok(());
         }
 
-        repository.create_bank(name)?;
+        repository.create_bank(name, path)?;
 
         Ok(())
     }
@@ -61,6 +62,14 @@ impl SubCmd for Bank {
                     .takes_value(true)
                     .required(true)
                     .help("Bank name"),
+            )
+            .arg(
+                Arg::with_name("path")
+                    .short("p")
+                    .long("path")
+                    .takes_value(true)
+                    .required(true)
+                    .help("Target path"),
             )
     }
 

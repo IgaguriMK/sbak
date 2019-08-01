@@ -31,10 +31,10 @@ impl<'a> Scanner<'a> {
     }
 
     /// 指定ディレクトリをスキャンする
-    pub fn scan<P: AsRef<Path>>(self, path: P) -> Result<()> {
+    pub fn scan(&self) -> Result<()> {
         let scan_start = Timestamp::now()?;
 
-        let id = self.scan_i(path.as_ref())?;
+        let id = self.scan_i(self.bank.target_path())?;
         self.bank.save_history(id.id(), scan_start)?;
 
         Ok(())

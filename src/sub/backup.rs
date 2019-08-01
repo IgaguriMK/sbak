@@ -1,8 +1,7 @@
 use std::io;
-use std::path::PathBuf;
 use std::process::exit;
 
-use clap::{App, ArgMatches, SubCommand};
+use clap::{App, Arg, ArgMatches, SubCommand};
 use failure::Fail;
 
 use super::SubCmd;
@@ -22,15 +21,18 @@ impl Backup {
         Backup()
     }
 
-    fn wrapped_exec(&self, _matches: &ArgMatches, _config: Config) -> Result<()> {
-        let target_dir = PathBuf::from("./sample-target");
+    fn wrapped_exec(&self, matches: &ArgMatches, config: Config) -> Result<()> {
+        let repo_path = matches
+            .value_of("repo")
+            .map(|s| s.parse().unwrap())
+            .or_else(|| config.repository_path().map(|p| p.to_owned()))
+            .ok_or_else(|| Error::Arg("no repository path"))?;
+        let repo = Repository::open(&repo_path)?;
 
-        let repo_dir = PathBuf::from("./sample-repo");
-        let repo = Repository::open(&repo_dir)?;
-
-        let bank = repo.open_bank("sample");
+        let bank_name = matches.value_of("bank").unwrap();
+        let bank = repo.open_bank(bank_name)?;
         let scanner = Scanner::new(bank);
-        scanner.scan(target_dir)?;
+        scanner.scan()?;
 
         Ok(())
     }
@@ -42,7 +44,22 @@ impl SubCmd for Backup {
     }
 
     fn command_args(&self) -> App {
-        SubCommand::with_name(self.name()).about("Backup files")
+        SubCommand::with_name(self.name())
+            .about("Backup files")
+            .arg(
+                Arg::with_name("repo")
+                    .long("repo")
+                    .takes_value(true)
+                    .help("Overwrite repository path"),
+            )
+            .arg(
+                Arg::with_name("bank")
+                    .short("b")
+                    .long("bank")
+                    .takes_value(true)
+                    .required(true)
+                    .help("Bank name"),
+            )
     }
 
     fn exec(&self, matches: &ArgMatches, config: Config) -> ! {
@@ -63,6 +80,9 @@ type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Fail)]
 pub enum Error {
+    #[fail(display = "{}", _0)]
+    Arg(&'static str),
+
     #[fail(display = "failed scan with IO error: {}", _0)]
     IO(#[fail(cause)] io::Error),
 

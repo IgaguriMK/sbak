@@ -12,6 +12,8 @@ use crate::core::entry::DirEntry;
 use crate::core::hash::{self, HashID};
 use crate::core::timestamp::Timestamp;
 
+const BANK_CONFIG_FILE: &str = "config.json";
+
 /// バックアップ先となるリポジトリのディレクトリを管理する型。
 ///
 /// リポジトリは共通のファイル本体を格納する`objects`ディレクトリと、`banks`以下にバックアップ元ごとに対応した[`Bank`](struct.Bank.html)を0個以上持つ。
@@ -29,7 +31,6 @@ impl Repository {
     ///
     /// 必須のリポジトリとして必要なルートディレクトリ、`objects`ディレクトリ、`banks`ディレクトリのどれかが存在しないか書き込み不可能な場合、[`Error::IncompleteRepo`](enum.Error.html)を返す。
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Repository, Error> {
-        // TODO: Readonlyでも読み込み用に開けるようにする。
         let repo = Repository::new(path);
 
         check_path(&repo.path, "repository directory")?;
@@ -69,16 +70,30 @@ impl Repository {
     }
 
     /// 指定された名前の[`Bank`](struct.Bank.html)を開く。
-    pub fn open_bank<'a>(&'a self, name: &str) -> Bank<'a> {
+    pub fn open_bank<'a>(&'a self, name: &str) -> Result<Bank<'a>, Error> {
         let bank_dir = self.bank_path(name);
-        Bank::new(self, bank_dir)
+
+        let f = fs::File::open(&bank_dir.join(BANK_CONFIG_FILE))?;
+        let config = from_reader(f)?;
+
+        Ok(Bank::new(self, bank_dir, config))
     }
 
     /// 指定された名前の[`Bank`](struct.Bank.html)を作成する。
-    pub fn create_bank(&self, name: &str) -> Result<(), Error> {
+    pub fn create_bank<P: AsRef<Path>>(&self, name: &str, target_path: P) -> Result<(), Error> {
         let bank_dir = self.bank_path(name);
-        let bank = Bank::new(self, bank_dir);
-        bank.create_dir()?;
+
+        let target_path = target_path.as_ref().canonicalize()?;
+        if !target_path.is_dir() {
+            return Err(Error::InvalidInput(format!(
+                "target path '{:?}' isn't directory.",
+                target_path
+            )));
+        }
+        let bank_config = BankConfig { target_path };
+
+        let bank = Bank::new(self, bank_dir, bank_config);
+        bank.create()?;
         Ok(())
     }
 
@@ -153,11 +168,12 @@ fn check_path(path: &Path, name: &'static str) -> Result<(), Error> {
 pub struct Bank<'a> {
     repo: &'a Repository,
     path: PathBuf,
+    config: BankConfig,
 }
 
 impl<'a> Bank<'a> {
-    fn new(repo: &'a Repository, path: PathBuf) -> Bank<'a> {
-        Bank { repo, path }
+    fn new(repo: &'a Repository, path: PathBuf, config: BankConfig) -> Bank<'a> {
+        Bank { repo, path, config }
     }
 
     /// ファイルを指定された`id`のオブジェクトとして保存する。
@@ -172,7 +188,7 @@ impl<'a> Bank<'a> {
 
         let last_scan = History { id, timestamp };
 
-        let history_file = history_dir.join(&timestamp.to_string());
+        let history_file = history_dir.join(&format!("{}.history.json", timestamp));
         let f = fs::File::create(&history_file)?;
         to_writer(f, &last_scan)?;
 
@@ -217,9 +233,18 @@ impl<'a> Bank<'a> {
         Ok(Some(history))
     }
 
-    fn create_dir(&self) -> Result<(), Error> {
+    /// バックアップ対象ディレクトリのパスを取得する
+    pub fn target_path(&self) -> &Path {
+        &self.config.target_path
+    }
+
+    fn create(&self) -> Result<(), Error> {
         ensure_dir(&self.path)?;
         ensure_dir(&self.history_dir())?;
+
+        let f = fs::File::create(&self.path.join(BANK_CONFIG_FILE))?;
+        to_writer(f, &self.config)?;
+
         Ok(())
     }
 
@@ -228,8 +253,13 @@ impl<'a> Bank<'a> {
     }
 
     fn last_scan_file(&self) -> PathBuf {
-        self.path.join("last_scan")
+        self.path.join("last_scan.json")
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct BankConfig {
+    target_path: PathBuf,
 }
 
 /// バックアップ履歴を表す
@@ -268,6 +298,10 @@ pub enum Error {
     /// リポジトリが不完全な状態である
     #[fail(display = "repository isn't complete: {} is {}", _0, _1)]
     IncompleteRepo(&'static str, &'static str),
+
+    /// 入力が不正である。
+    #[fail(display = "invalid input: {}", _0)]
+    InvalidInput(String),
 
     /// 指定されたエントリが存在しない
     #[fail(display = "object not exists: {}", _0)]
