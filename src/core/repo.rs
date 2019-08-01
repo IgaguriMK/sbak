@@ -91,7 +91,7 @@ impl Repository {
             let name = dir_entry
                 .file_name()
                 .into_string()
-                .map_err(|e| Error::InvalidBankName(e))?;
+                .map_err(Error::InvalidBankName)?;
             names.push(name);
         }
 

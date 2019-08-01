@@ -10,56 +10,68 @@ use failure::Fail;
 use serde_json::to_writer;
 
 use crate::core::entry::*;
-use crate::core::hash::{self, hash_reader};
-use crate::core::repo::Bank;
+use crate::core::hash::{self, hash_reader, HashID};
+use crate::core::repo::{self, Bank};
 use crate::core::timestamp::{self, Timestamp};
 
 /// 更新されたファイルやディレクトリをスキャンするスキャナ
 #[derive(Debug)]
 pub struct Scanner<'a> {
-    last_scan: Timestamp,
     bank: Bank<'a>,
 }
 
 impl<'a> Scanner<'a> {
     /// 指定された`Bank`に保存する、デフォルト設定のスキャナを生成する
     pub fn new(bank: Bank<'a>) -> Scanner {
-        Scanner {
-            last_scan: Timestamp::default(),
-            bank,
-        }
+        Scanner { bank }
     }
 
     /// 指定ディレクトリをスキャンする
     pub fn scan(&self) -> Result<()> {
         let scan_start = Timestamp::now()?;
 
-        let id = self.scan_i(self.bank.target_path())?;
+        let path = self.bank.target_path();
+        let last_id = self.bank.last_scan()?.map(|e| e.id().clone());
+        let attr = convert_metadata(path, &fs::metadata(path)?)?;
+
+        let id = self.scan_dir(path, attr, last_id)?;
         self.bank.save_history(id.id(), scan_start)?;
 
         Ok(())
     }
 
-    fn scan_i(&self, p: &Path) -> Result<FsHash> {
+    fn scan_i(&self, p: &Path, last_entry: Option<&FsHash>) -> Result<FsHash> {
         eprintln!("{:?}", p);
         let fs_meta = fs::metadata(p)?;
         let attr = convert_metadata(p, &fs_meta)?;
 
         if fs_meta.is_dir() {
-            Ok(self.scan_dir(p, attr)?)
+            Ok(self.scan_dir(p, attr, last_entry.map(|x| x.id()))?)
         } else if fs_meta.is_file() {
-            Ok(self.scan_file(p, attr)?)
+            let old_hash = last_entry.and_then(|h| h.clone().try_into().ok());
+            let file_hash = self.scan_file(p, attr, old_hash)?;
+            Ok(file_hash)
         } else {
             panic!("{:?} is not dir nor file", p)
         }
     }
 
-    fn scan_dir(&self, p: &Path, attr: Attributes) -> Result<FsHash> {
+    fn scan_dir(&self, p: &Path, attr: Attributes, last_id: Option<HashID>) -> Result<FsHash> {
+        let old_entry = if let Some(ref id) = last_id {
+            self.bank.load_dir_entry(id)?
+        } else {
+            DirEntryBuilder::new(attr.clone()).build()
+        };
+
         let mut builder = DirEntryBuilder::new(attr);
 
         for ch in fs::read_dir(p)? {
             let ch = ch?;
-            let ch_hash = self.scan_i(&ch.path())?;
+            let name = ch
+                .file_name()
+                .into_string()
+                .map_err(|_| Error::NameIsInvalidUnicode(ch.path().to_owned()))?;
+            let ch_hash = self.scan_i(&ch.path(), old_entry.find_child(&name))?;
             builder.append(ch_hash);
         }
 
@@ -76,7 +88,19 @@ impl<'a> Scanner<'a> {
         Ok(FsHash::try_from(entry).unwrap())
     }
 
-    fn scan_file(&self, p: &Path, attr: Attributes) -> Result<FsHash> {
+    fn scan_file(
+        &self,
+        p: &Path,
+        attr: Attributes,
+        last_entry: Option<FileHash>,
+    ) -> Result<FsHash> {
+        if let Some(last_entry) = last_entry {
+            if last_entry.attr().modified() == attr.modified() {
+                eprintln!("skip.");
+                return Ok(last_entry.into());
+            }
+        }
+
         let mut entry = FileEntry::new(attr);
 
         let f = fs::File::open(p)?;
@@ -126,6 +150,10 @@ pub enum Error {
     #[fail(display = "found empty name entry at {:?}", _0)]
     NameIsInvalidUnicode(PathBuf),
 
+    /// リポジトリ操作エラーが発生
+    #[fail(display = "{}", _0)]
+    Repo(#[fail(cause)] repo::Error),
+
     /// 対応範囲外のタイムスタンプを検出
     #[fail(display = "timestamp is older than UNIX epoch")]
     Timestamp,
@@ -154,5 +182,11 @@ impl From<hash::Error> for Error {
         match e {
             hash::Error::IO(e) => Error::IO(e),
         }
+    }
+}
+
+impl From<repo::Error> for Error {
+    fn from(e: repo::Error) -> Error {
+        Error::Repo(e)
     }
 }

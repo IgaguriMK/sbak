@@ -1,6 +1,6 @@
 //!ファイルシステムのスキャン結果の表現
 
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use std::path::{Path, PathBuf};
 
 use failure::Fail;
@@ -76,6 +76,34 @@ pub struct DirEntry {
     childlen: Vec<FsHash>,
 }
 
+impl DirEntry {
+    /// 指定された名前の子エントリを取得する。
+    pub fn find_child(&self, name: &str) -> Option<&FsHash> {
+        for ch in &self.childlen {
+            if ch.attr().name() == name {
+                return Some(ch);
+            }
+        }
+        None
+    }
+
+    /// 指定された名前の子ディレクトリエントリを取得する。
+    pub fn find_dir(&self, name: &str) -> Option<&DirHash> {
+        match self.find_child(name) {
+            Some(FsHash::Dir(x)) => Some(x),
+            _ => None,
+        }
+    }
+
+    /// 指定された名前の子ファイルエントリを取得する。
+    pub fn find_file(&self, name: &str) -> Option<&FileHash> {
+        match self.find_child(name) {
+            Some(FsHash::File(x)) => Some(x),
+            _ => None,
+        }
+    }
+}
+
 impl Entry for DirEntry {
     fn id(&self) -> Option<HashID> {
         self.id.clone()
@@ -110,7 +138,7 @@ impl DirEntryBuilder {
         self.childlen.push(ch);
     }
 
-    /// 正規化された[`DirEntry`](struct.DirEntry.html)を取得する。
+    /// 正規化された[`DirEntry`](struct.DirEntry.html)を生成する。
     pub fn build(mut self) -> DirEntry {
         self.childlen.sort();
 
@@ -169,6 +197,21 @@ impl Attributes {
             modified,
         }
     }
+
+    /// エントリの名前を取得する。
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// 読み込み専用かどうかを取得する。
+    pub fn readonly(&self) -> bool {
+        self.readonly
+    }
+
+    /// 更新日時を取得する。
+    pub fn modified(&self) -> Timestamp {
+        self.modified
+    }
 }
 
 /// エントリのハッシュ値と属性
@@ -177,17 +220,25 @@ impl Attributes {
 #[serde(tag = "type")]
 pub enum FsHash {
     #[serde(rename = "dir")]
-    Dir { attr: Attributes, id: HashID },
+    Dir(DirHash),
     #[serde(rename = "file")]
-    File { attr: Attributes, id: HashID },
+    File(FileHash),
 }
 
 impl FsHash {
-    /// ハッシュ値を取得する
+    /// ハッシュ値を取得する。
     pub fn id(&self) -> HashID {
         match self {
-            FsHash::Dir { id, .. } => id.clone(),
-            FsHash::File { id, .. } => id.clone(),
+            FsHash::Dir(x) => x.id(),
+            FsHash::File(x) => x.id(),
+        }
+    }
+
+    /// Attributesを取得する。
+    pub fn attr(&self) -> &Attributes {
+        match self {
+            FsHash::Dir(x) => x.attr(),
+            FsHash::File(x) => x.attr(),
         }
     }
 }
@@ -196,11 +247,7 @@ impl TryFrom<DirEntry> for FsHash {
     type Error = NoIdError;
 
     fn try_from(e: DirEntry) -> Result<Self, Self::Error> {
-        if let Some(id) = e.id() {
-            Ok(FsHash::Dir { attr: e.attr, id })
-        } else {
-            Err(NoIdError::NoId)
-        }
+        e.try_into().map(FsHash::Dir)
     }
 }
 
@@ -208,18 +255,115 @@ impl TryFrom<FileEntry> for FsHash {
     type Error = NoIdError;
 
     fn try_from(e: FileEntry) -> Result<Self, Self::Error> {
+        e.try_into().map(FsHash::File)
+    }
+}
+
+impl From<DirHash> for FsHash {
+    fn from(x: DirHash) -> FsHash {
+        FsHash::Dir(x)
+    }
+}
+
+impl From<FileHash> for FsHash {
+    fn from(x: FileHash) -> FsHash {
+        FsHash::File(x)
+    }
+}
+
+/// ディレクトリを表すディレクトリの子エントリ
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct DirHash {
+    attr: Attributes,
+    id: HashID,
+}
+
+impl DirHash {
+    /// ハッシュ値を取得する。
+    pub fn id(&self) -> HashID {
+        self.id.clone()
+    }
+
+    /// Attributesを取得する。
+    pub fn attr(&self) -> &Attributes {
+        &self.attr
+    }
+}
+
+impl TryFrom<DirEntry> for DirHash {
+    type Error = NoIdError;
+
+    fn try_from(e: DirEntry) -> Result<Self, Self::Error> {
         if let Some(id) = e.id() {
-            Ok(FsHash::File { attr: e.attr, id })
+            Ok(DirHash { attr: e.attr, id })
         } else {
             Err(NoIdError::NoId)
         }
     }
 }
 
-/// エントリの`FsHash`への変換で発生しうるエラー
+impl TryFrom<FsHash> for DirHash {
+    type Error = MismatchHashType;
+
+    fn try_from(h: FsHash) -> Result<Self, Self::Error> {
+        match h {
+            FsHash::Dir(x) => Ok(x),
+            h => Err(MismatchHashType(h)),
+        }
+    }
+}
+
+/// ファイルを表すディレクトリの子エントリ
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct FileHash {
+    attr: Attributes,
+    id: HashID,
+}
+
+impl FileHash {
+    /// ハッシュ値を取得する。
+    pub fn id(&self) -> HashID {
+        self.id.clone()
+    }
+
+    /// Attributesを取得する。
+    pub fn attr(&self) -> &Attributes {
+        &self.attr
+    }
+}
+
+impl TryFrom<FileEntry> for FileHash {
+    type Error = NoIdError;
+
+    fn try_from(e: FileEntry) -> Result<Self, Self::Error> {
+        if let Some(id) = e.id() {
+            Ok(FileHash { attr: e.attr, id })
+        } else {
+            Err(NoIdError::NoId)
+        }
+    }
+}
+
+impl TryFrom<FsHash> for FileHash {
+    type Error = MismatchHashType;
+
+    fn try_from(h: FsHash) -> Result<Self, Self::Error> {
+        match h {
+            FsHash::File(x) => Ok(x),
+            h => Err(MismatchHashType(h)),
+        }
+    }
+}
+
+/// エントリの[`FsHash`](struct.FsHash.html)への変換で発生しうるエラー
 #[derive(Debug, Fail)]
 pub enum NoIdError {
     /// IDが未設定である
     #[fail(display = "entry id isn't calculated")]
     NoId,
 }
+
+/// [`FsHash`](struct.FsHash.html)から[`DirHash`](struct.DirHash.html)や[`FileHash`](struct.FileHash.html)への変換で発生しうるエラー
+#[derive(Debug, Fail)]
+#[fail(display = "mismatch hash type")]
+pub struct MismatchHashType(FsHash);
