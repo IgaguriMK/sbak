@@ -7,7 +7,7 @@ use failure::Fail;
 use super::SubCmd;
 
 use crate::config::Config;
-use crate::core::repo::{self, Repository};
+use crate::core::repo::{self, Bank, Repository};
 use crate::core::scan::{self, Scanner};
 
 pub fn new() -> Box<dyn SubCmd> {
@@ -29,13 +29,24 @@ impl Backup {
             .ok_or_else(|| Error::Arg("no repository path"))?;
         let repo = Repository::open(&repo_path)?;
 
-        let bank_name = matches.value_of("bank").unwrap();
-        let bank = repo.open_bank(bank_name)?;
-        let scanner = Scanner::new(bank);
-        scanner.scan()?;
+        if let Some(bank_name) = matches.value_of("bank") {
+            let bank = repo.open_bank(bank_name)?;
+            scan(bank)?;
+        } else {
+            for bank in repo.open_all_banks()? {
+                let bank = bank?;
+                scan(bank)?;
+            }
+        }
 
         Ok(())
     }
+}
+
+fn scan(bank: Bank) -> Result<()> {
+    let scanner = Scanner::new(bank);
+    scanner.scan()?;
+    Ok(())
 }
 
 impl SubCmd for Backup {
@@ -57,7 +68,6 @@ impl SubCmd for Backup {
                     .short("b")
                     .long("bank")
                     .takes_value(true)
-                    .required(true)
                     .help("Bank name"),
             )
     }

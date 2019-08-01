@@ -1,5 +1,6 @@
 //! バックアップ先となるリポジトリの操作
 
+use std::ffi::OsString;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -77,6 +78,27 @@ impl Repository {
         let config = from_reader(f)?;
 
         Ok(Bank::new(self, bank_dir, config))
+    }
+
+    /// 全ての[`Bank`](struct.Bank.html)を開くイテレータを取得する。
+    ///
+    /// 要素の順序はBankの名前の辞書順になる。
+    pub fn open_all_banks(&self) -> Result<Banks, Error> {
+        let mut names = Vec::<String>::new();
+
+        for dir_entry in self.banks_dir.read_dir()? {
+            let dir_entry = dir_entry?;
+            let name = dir_entry
+                .file_name()
+                .into_string()
+                .map_err(|e| Error::InvalidBankName(e))?;
+            names.push(name);
+        }
+
+        names.sort();
+        names.reverse();
+
+        Ok(Banks { repo: self, names })
     }
 
     /// 指定された名前の[`Bank`](struct.Bank.html)を作成する。
@@ -160,6 +182,24 @@ fn check_path(path: &Path, name: &'static str) -> Result<(), Error> {
         Err(Error::IncompleteRepo(name, "read only"))
     } else {
         Ok(())
+    }
+}
+
+/// Bank一覧のイテレータ
+pub struct Banks<'a> {
+    repo: &'a Repository,
+    names: Vec<String>,
+}
+
+impl<'a> Iterator for Banks<'a> {
+    type Item = Result<Bank<'a>, Error>;
+
+    fn next(&mut self) -> Option<Result<Bank<'a>, Error>> {
+        if let Some(name) = self.names.pop() {
+            Some(self.repo.open_bank(&name))
+        } else {
+            None
+        }
     }
 }
 
@@ -291,22 +331,6 @@ fn ensure_dir(path: &Path) -> Result<(), io::Error> {
 /// リポジトリ操作に関わるエラー
 #[derive(Debug, Fail)]
 pub enum Error {
-    /// 入出力エラーが発生した
-    #[fail(display = "failed scan with IO error: {}", _0)]
-    IO(#[fail(cause)] io::Error),
-
-    /// リポジトリが不完全な状態である
-    #[fail(display = "repository isn't complete: {} is {}", _0, _1)]
-    IncompleteRepo(&'static str, &'static str),
-
-    /// 入力が不正である。
-    #[fail(display = "invalid input: {}", _0)]
-    InvalidInput(String),
-
-    /// 指定されたエントリが存在しない
-    #[fail(display = "object not exists: {}", _0)]
-    EntryNotFound(HashID),
-
     /// エントリのハッシュ値が一致しない
     #[fail(display = "object not exists: {}", _0)]
     BrokenObject {
@@ -315,6 +339,26 @@ pub enum Error {
         /// 実際に得られたID値
         actual: HashID,
     },
+
+    /// 指定されたエントリが存在しない
+    #[fail(display = "object not exists: {}", _0)]
+    EntryNotFound(HashID),
+
+    /// リポジトリが不完全な状態である
+    #[fail(display = "repository isn't complete: {} is {}", _0, _1)]
+    IncompleteRepo(&'static str, &'static str),
+
+    /// パスがUnicodeで表現できない
+    #[fail(display = "invalid bank name {:?}", _0)]
+    InvalidBankName(OsString),
+
+    /// 入力が不正である。
+    #[fail(display = "invalid input: {}", _0)]
+    InvalidInput(String),
+
+    /// 入出力エラーが発生した
+    #[fail(display = "failed scan with IO error: {}", _0)]
+    IO(#[fail(cause)] io::Error),
 
     /// JSONのパースに失敗した
     #[fail(display = "failed parse entry: {}", _0)]
