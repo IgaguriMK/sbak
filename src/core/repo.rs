@@ -231,8 +231,7 @@ impl<'a> Bank<'a> {
         let last_scan = History { id, timestamp };
         trace!("history entry = {:?}", last_scan);
 
-        let history_file =
-            history_dir.join(&format!("{}{}", timestamp.into_unix_epoch(), HISTORY_SUFFIX));
+        let history_file = history_dir.join(&last_scan.file_name());
         trace!("history_file = {:?}", history_file);
         let f = fs::File::create(&history_file)?;
         to_writer(f, &last_scan)?;
@@ -350,6 +349,10 @@ impl History {
     /// 履歴のバックアップ開始時刻のタイムスタンプを得る。
     pub fn timestamp(&self) -> Timestamp {
         self.timestamp
+    }
+
+    fn file_name(&self) -> String {
+        format!("{}{}", self.timestamp.into_unix_epoch(), HISTORY_SUFFIX)
     }
 }
 
