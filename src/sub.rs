@@ -8,6 +8,7 @@ use clap::{App, ArgMatches};
 use crate::config::Config;
 
 mod backup;
+mod history;
 mod info;
 mod init;
 
@@ -30,6 +31,7 @@ pub fn sub_commands() -> SubCommandSet {
     let mut set = SubCommandSet::new();
 
     set.append(backup::new());
+    set.append(history::new());
     set.append(init::new());
     set.append(info::new());
 

@@ -15,6 +15,7 @@ use crate::core::hash::{self, HashID};
 use crate::core::timestamp::Timestamp;
 
 const BANK_CONFIG_FILE: &str = "config.json";
+const HISTORY_SUFFIX: &str = ".history.json";
 
 /// バックアップ先となるリポジトリのディレクトリを管理する型。
 ///
@@ -88,11 +89,10 @@ impl Repository {
         let mut names = Vec::<String>::new();
 
         for dir_entry in self.banks_dir.read_dir()? {
-            let dir_entry = dir_entry?;
-            let name = dir_entry
+            let name = dir_entry?
                 .file_name()
                 .into_string()
-                .map_err(Error::InvalidBankName)?;
+                .map_err(Error::InvalidFileName)?;
             names.push(name);
         }
 
@@ -232,7 +232,7 @@ impl<'a> Bank<'a> {
         trace!("history entry = {:?}", last_scan);
 
         let history_file =
-            history_dir.join(&format!("{}.history.json", timestamp.into_unix_epoch()));
+            history_dir.join(&format!("{}{}", timestamp.into_unix_epoch(), HISTORY_SUFFIX));
         trace!("history_file = {:?}", history_file);
         let f = fs::File::create(&history_file)?;
         to_writer(f, &last_scan)?;
@@ -279,6 +279,30 @@ impl<'a> Bank<'a> {
         let history: History = from_reader(f)?;
 
         Ok(Some(history))
+    }
+
+    /// 履歴の一覧を得る。
+    ///
+    /// 古い順にソートされて返される。
+    pub fn histories(&self) -> Result<Vec<History>, Error> {
+        let mut res = Vec::<History>::new();
+
+        for file in self.history_dir().read_dir()? {
+            let file = file?;
+            let name = file
+                .file_name()
+                .into_string()
+                .map_err(Error::InvalidFileName)?;
+
+            if name.ends_with(HISTORY_SUFFIX) {
+                let f = fs::File::open(file.path())?;
+                let history: History = from_reader(f)?;
+                res.push(history);
+            }
+        }
+
+        res.sort();
+        Ok(res)
     }
 
     /// バックアップ対象ディレクトリのパスを取得する
@@ -357,8 +381,8 @@ pub enum Error {
     IncompleteRepo(&'static str, &'static str),
 
     /// パスがUnicodeで表現できない
-    #[fail(display = "invalid bank name {:?}", _0)]
-    InvalidBankName(OsString),
+    #[fail(display = "invalid file name {:?}", _0)]
+    InvalidFileName(OsString),
 
     /// 入力が不正である。
     #[fail(display = "invalid input: {}", _0)]
