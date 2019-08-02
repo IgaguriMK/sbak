@@ -6,6 +6,7 @@ use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
 use failure::Fail;
+use log::LevelFilter;
 use serde::{Deserialize, Serialize};
 use toml::de::{self as toml_de, from_slice};
 
@@ -102,18 +103,43 @@ pub fn config_pathes() -> Result<Vec<PathBuf>> {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Config {
     repository_path: Option<PathBuf>,
+    verbose: Option<VerboseLevel>,
 }
 
 impl Config {
-    /// リポジトリのパスを取得する
+    /// リポジトリのパスを取得する。
     pub fn repository_path(&self) -> Option<&Path> {
         self.repository_path.as_ref().map(|p| p.as_ref())
     }
+
+    /// リポジトリのパスを設定する。
+    pub fn set_repository_path<P: AsRef<Path>>(&mut self, path: P) {
+        self.repository_path = Some(path.as_ref().to_owned());
+    }
+
+    /// ログ表示のレベルを取得する。
+    pub fn verbose(&self) -> VerboseLevel {
+        self.verbose.unwrap_or_default()
+    }
+
+    /// ログ表示のレベルを設定する。
+    pub fn set_verbose(&mut self, level: VerboseLevel) {
+        self.verbose = Some(level);
+    }
+
+    /// ログ表示レベルをロガーに適用する。
+    pub fn apply_verbose(&self) {
+        let mut builder = env_logger::builder();
+        builder.filter_level(self.verbose().into()).init();
+    }
+
+    /***********************************************************/
 
     /// 他の設定ファイルの設定値で上書きした新規の`Config`を返す。
     pub fn merged(&self, overwrite: &Config) -> Config {
         Config {
             repository_path: merge(&self.repository_path, &overwrite.repository_path),
+            verbose: merge(&self.verbose, &overwrite.verbose),
         }
     }
 
@@ -126,6 +152,56 @@ impl Config {
 
 fn merge<T: Clone>(x: &Option<T>, overwrite: &Option<T>) -> Option<T> {
     overwrite.clone().or_else(|| x.clone())
+}
+
+/// 追加表示のレベル
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VerboseLevel {
+    /// 無効
+    Off,
+    /// エラーのみ
+    Error,
+    /// 警告を表示
+    Warn,
+    /// 詳細動作を表示
+    Info,
+    /// デバッグ用
+    Debug,
+    /// より詳細なデバッグ用
+    Trace,
+}
+
+impl VerboseLevel {
+    /// コマンドラインオプションの`v`の数からログレベルを設定する。
+    pub fn from_v_count(count: usize) -> VerboseLevel {
+        match count {
+            0 => VerboseLevel::Error,
+            1 => VerboseLevel::Warn,
+            2 => VerboseLevel::Info,
+            3 => VerboseLevel::Debug,
+            _ => VerboseLevel::Trace,
+        }
+    }
+}
+
+impl Default for VerboseLevel {
+    fn default() -> VerboseLevel {
+        VerboseLevel::Off
+    }
+}
+
+impl Into<LevelFilter> for VerboseLevel {
+    fn into(self) -> LevelFilter {
+        match self {
+            VerboseLevel::Off => LevelFilter::Off,
+            VerboseLevel::Error => LevelFilter::Error,
+            VerboseLevel::Warn => LevelFilter::Warn,
+            VerboseLevel::Info => LevelFilter::Info,
+            VerboseLevel::Debug => LevelFilter::Debug,
+            VerboseLevel::Trace => LevelFilter::Trace,
+        }
+    }
 }
 
 type Result<T> = std::result::Result<T, Error>;

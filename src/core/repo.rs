@@ -6,6 +6,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use failure::Fail;
+use log::trace;
 use serde::{Deserialize, Serialize};
 use serde_json::{self, from_reader, to_writer};
 
@@ -224,17 +225,24 @@ impl<'a> Bank<'a> {
     /// スキャン結果のエンティティのIDを`timestamp`時点での履歴として保存する。
     pub fn save_history(&self, id: HashID, timestamp: Timestamp) -> Result<(), io::Error> {
         let history_dir = self.history_dir();
+        trace!("history_dir = {:?}", history_dir);
         ensure_dir(&history_dir)?;
 
         let last_scan = History { id, timestamp };
+        trace!("history entry = {:?}", last_scan);
 
-        let history_file = history_dir.join(&format!("{}.history.json", timestamp));
+        let history_file =
+            history_dir.join(&format!("{}.history.json", timestamp.into_unix_epoch()));
+        trace!("history_file = {:?}", history_file);
         let f = fs::File::create(&history_file)?;
         to_writer(f, &last_scan)?;
+        trace!("finish save history file");
 
         let last_scan_file = self.last_scan_file();
+        trace!("last_scan_file = {:?}", last_scan_file);
         let f = fs::File::create(&last_scan_file)?;
         to_writer(f, &last_scan)?;
+        trace!("finish save last_scan");
 
         Ok(())
     }

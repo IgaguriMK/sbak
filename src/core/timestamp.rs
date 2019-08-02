@@ -4,6 +4,7 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::time::{SystemTime, SystemTimeError, UNIX_EPOCH};
 
+use chrono::NaiveDateTime;
 use failure::Fail;
 use serde::{Deserialize, Serialize};
 
@@ -23,6 +24,11 @@ impl Timestamp {
     pub fn now() -> Result<Timestamp> {
         Timestamp::try_from(SystemTime::now())
     }
+
+    /// Unix epochからの経過秒数を返す。
+    pub fn into_unix_epoch(self) -> u64 {
+        self.0
+    }
 }
 
 impl TryFrom<SystemTime> for Timestamp {
@@ -36,7 +42,8 @@ impl TryFrom<SystemTime> for Timestamp {
 
 impl fmt::Display for Timestamp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
+        let nt = NaiveDateTime::from_timestamp(self.0 as i64, 0);
+        write!(f, "{}", nt)
     }
 }
 

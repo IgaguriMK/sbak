@@ -6,7 +6,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use failure::Fail;
-
+use log::{info, trace};
 use serde_json::to_writer;
 
 use crate::core::entry::*;
@@ -29,25 +29,34 @@ impl<'a> Scanner<'a> {
     /// 指定ディレクトリをスキャンする
     pub fn scan(&self) -> Result<()> {
         let scan_start = Timestamp::now()?;
+        info!("scan start at {}", scan_start);
 
         let path = self.bank.target_path();
+        trace!("scan root path = {:?}", path);
         let last_id = self.bank.last_scan()?.map(|e| e.id().clone());
+        trace!("last_scan root entry id = {:?}", last_id);
         let attr = convert_metadata(path, &fs::metadata(path)?)?;
 
+        trace!("start scan root dir");
         let id = self.scan_dir(path, attr, last_id)?;
+        trace!("start save history");
         self.bank.save_history(id.id(), scan_start)?;
+        trace!("finish scan {:?}", path);
 
         Ok(())
     }
 
     fn scan_i(&self, p: &Path, last_entry: Option<&FsHash>) -> Result<FsHash> {
-        eprintln!("{:?}", p);
+        info!("{:?}", p);
         let fs_meta = fs::metadata(p)?;
         let attr = convert_metadata(p, &fs_meta)?;
+        trace!("{:?}: {:?}", p, attr);
 
         if fs_meta.is_dir() {
+            trace!("{:?} is dir.", p);
             Ok(self.scan_dir(p, attr, last_entry.map(|x| x.id()))?)
         } else if fs_meta.is_file() {
+            trace!("{:?} is file.", p);
             let old_hash = last_entry.and_then(|h| h.clone().try_into().ok());
             let file_hash = self.scan_file(p, attr, old_hash)?;
             Ok(file_hash)
@@ -57,31 +66,41 @@ impl<'a> Scanner<'a> {
     }
 
     fn scan_dir(&self, p: &Path, attr: Attributes, last_id: Option<HashID>) -> Result<FsHash> {
+        trace!("scan dir {:?}", p);
         let old_entry = if let Some(ref id) = last_id {
+            trace!("dir has last_id = {}", id);
             self.bank.load_dir_entry(id)?
         } else {
+            trace!("dir has no last_id");
             DirEntryBuilder::new(attr.clone()).build()
         };
 
         let mut builder = DirEntryBuilder::new(attr);
 
+        trace!("start scan dir children: {:?}", p);
         for ch in fs::read_dir(p)? {
             let ch = ch?;
             let name = ch
                 .file_name()
                 .into_string()
                 .map_err(|_| Error::NameIsInvalidUnicode(ch.path().to_owned()))?;
+            trace!("child name = {}", name);
             let ch_hash = self.scan_i(&ch.path(), old_entry.find_child(&name))?;
             builder.append(ch_hash);
         }
+        trace!("finish scan dir children: {:?}", p);
 
         let mut entry = builder.build();
 
+        trace!("start encode dir entry {:?}", p);
         let mut encoded = Vec::<u8>::new();
         to_writer(&mut encoded, &entry)?;
 
+        trace!("start hash dir entry {:?}", p);
         let (id, temp) = hash_reader(encoded.as_slice())?;
+        trace!("start save dir entry {:?} = {}", p, id);
         self.bank.save_object(&id, temp)?;
+        trace!("dir entry saved {:?} = {}", p, id);
 
         entry.set_id(id.clone());
 
@@ -94,18 +113,23 @@ impl<'a> Scanner<'a> {
         attr: Attributes,
         last_entry: Option<FileHash>,
     ) -> Result<FsHash> {
+        trace!("scan file {:?}", p);
         if let Some(last_entry) = last_entry {
             if last_entry.attr().modified() == attr.modified() {
-                eprintln!("skip.");
+                trace!("skip scan file {:?}", p);
                 return Ok(last_entry.into());
             }
         }
 
         let mut entry = FileEntry::new(attr);
 
+        trace!("start scan file {:?}", p);
         let f = fs::File::open(p)?;
         let (id, temp) = hash_reader(f)?;
+        trace!("file hash {:?} = {}", p, id);
+        trace!("start save file object {}", id);
         self.bank.save_object(&id, temp)?;
+        trace!("finish save file object {}", id);
 
         entry.set_id(id.clone());
 
@@ -129,7 +153,7 @@ fn convert_metadata(path: &Path, fs_meta: &fs::Metadata) -> Result<Attributes> {
 }
 
 #[allow(missing_docs)]
-pub type Result<T> = std::result::Result<T, Error>;
+type Result<T> = std::result::Result<T, Error>;
 
 /// ファイルシステムのスキャンで発生しうるエラー
 #[derive(Debug, Fail)]
