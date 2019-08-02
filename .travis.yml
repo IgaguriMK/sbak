@@ -9,3 +9,8 @@ before_script:
 script:
   - cargo clippy -- -D warnings
   - cargo test
+cache:
+  directories:
+    - /home/travis/.cargo
+before_cache:
+  - rm -rf /home/travis/.cargo/registry
