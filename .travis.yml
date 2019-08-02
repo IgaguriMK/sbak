@@ -1,6 +1,9 @@
 language: rust
 rust:
   - stable
+os:
+  - linux
+  - windows
 before_script:
   - rustup component add clippy
 script:

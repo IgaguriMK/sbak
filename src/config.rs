@@ -48,7 +48,7 @@ pub fn auto_load() -> Result<Config> {
 /// 起動時に読み込む設定ファイルの探索パスの一覧を返す。
 ///
 /// ターゲットとなる環境に応じて切り替えられる。
-#[cfg(linux)]
+#[cfg(target_os = "linux")]
 pub fn config_pathes() -> Result<Vec<PathBuf>> {
     let mut pathes = Vec::<PathBuf>::new();
 
@@ -67,7 +67,7 @@ pub fn config_pathes() -> Result<Vec<PathBuf>> {
 /// 起動時に読み込む設定ファイルの探索パスの一覧を返す。
 ///
 /// ターゲットとなる環境に応じて切り替えられる。
-#[cfg(windows)]
+#[cfg(target_os = "windows")]
 pub fn config_pathes() -> Result<Vec<PathBuf>> {
     let mut pathes = Vec::<PathBuf>::new();
 
