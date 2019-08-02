@@ -3,12 +3,14 @@ use std::process::exit;
 
 use clap::{App, Arg, ArgMatches, SubCommand};
 use failure::Fail;
+use log::{info, trace};
 
 use super::SubCmd;
 
 use crate::config::Config;
 use crate::core::repo::{self, Bank, Repository};
 use crate::core::scan::{self, Scanner};
+use crate::core::timestamp::{self, Timestamp};
 
 pub fn new() -> Box<dyn SubCmd> {
     Box::new(Backup::new())
@@ -44,8 +46,16 @@ impl Backup {
 }
 
 fn scan(bank: Bank) -> Result<()> {
-    let scanner = Scanner::new(bank);
-    scanner.scan()?;
+    let scan_start = Timestamp::now()?;
+    info!("scan start at {}", scan_start);
+
+    let scanner = Scanner::new(&bank);
+    let id = scanner.scan()?;
+
+    trace!("start save history");
+    bank.save_history(id.id(), scan_start)?;
+    trace!("finish scan {:?}", bank.target_path());
+
     Ok(())
 }
 
@@ -101,6 +111,9 @@ pub enum Error {
 
     #[fail(display = "repository operation error: {}", _0)]
     Repo(#[fail(cause)] repo::Error),
+
+    #[fail(display = "timestamp is older than UNIX epoch")]
+    Timestamp,
 }
 
 impl From<io::Error> for Error {
@@ -118,5 +131,11 @@ impl From<scan::Error> for Error {
 impl From<repo::Error> for Error {
     fn from(e: repo::Error) -> Error {
         Error::Repo(e)
+    }
+}
+
+impl From<timestamp::Error> for Error {
+    fn from(_e: timestamp::Error) -> Error {
+        Error::Timestamp
     }
 }

@@ -12,25 +12,22 @@ use serde_json::to_writer;
 use crate::core::entry::*;
 use crate::core::hash::{self, hash_reader, HashID};
 use crate::core::repo::{self, Bank};
-use crate::core::timestamp::{self, Timestamp};
+use crate::core::timestamp;
 
 /// 更新されたファイルやディレクトリをスキャンするスキャナ
 #[derive(Debug)]
 pub struct Scanner<'a> {
-    bank: Bank<'a>,
+    bank: &'a Bank<'a>,
 }
 
 impl<'a> Scanner<'a> {
     /// 指定された`Bank`に保存する、デフォルト設定のスキャナを生成する
-    pub fn new(bank: Bank<'a>) -> Scanner {
+    pub fn new(bank: &'a Bank<'a>) -> Scanner {
         Scanner { bank }
     }
 
-    /// 指定ディレクトリをスキャンする
-    pub fn scan(&self) -> Result<()> {
-        let scan_start = Timestamp::now()?;
-        info!("scan start at {}", scan_start);
-
+    /// Bankの対象ディレクトリをスキャンする
+    pub fn scan(&self) -> Result<FsHash> {
         let path = self.bank.target_path();
         trace!("scan root path = {:?}", path);
         let last_id = self.bank.last_scan()?.map(|e| e.id().clone());
@@ -39,11 +36,8 @@ impl<'a> Scanner<'a> {
 
         trace!("start scan root dir");
         let id = self.scan_dir(path, attr, last_id)?;
-        trace!("start save history");
-        self.bank.save_history(id.id(), scan_start)?;
-        trace!("finish scan {:?}", path);
 
-        Ok(())
+        Ok(id)
     }
 
     fn scan_i(&self, p: &Path, last_entry: Option<&FsHash>) -> Result<FsHash> {
