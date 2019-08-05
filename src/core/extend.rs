@@ -7,6 +7,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use failure::Fail;
+use filetime::set_file_mtime;
 use log::{info, trace};
 
 use crate::core::entry::{DirEntry, Entry, FileHash, FsHash};
@@ -154,12 +155,13 @@ impl<'a> Extender<'a> {
         io::copy(&mut f, &mut out)?;
 
         if !exists || self.overwrite {
+            let attr = file_hash.attr();
+
             let mut permission = fs::metadata(path)?.permissions();
-            trace!(
-                "overrite permission readonly={}",
-                file_hash.attr().readonly()
-            );
-            permission.set_readonly(file_hash.attr().readonly());
+            trace!("overrite permission readonly={}", attr.readonly());
+            permission.set_readonly(attr.readonly());
+
+            set_file_mtime(path, attr.modified().into())?;
         }
 
         Ok(())

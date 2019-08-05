@@ -13,6 +13,7 @@ clap = "2.33"
 dirs = "2.0.2"
 env_logger = "0.6.2"
 failure = "0.1.5"
+filetime = "0.2.6"
 hex = "0.3.2"
 log = "0.4.8"
 serde = {version="1.0.97", features=["derive"]}
