@@ -1,7 +1,6 @@
 //!ファイルシステムのスキャン結果の表現
 
 use std::convert::{TryFrom, TryInto};
-use std::path::{Path, PathBuf};
 
 use failure::Fail;
 use serde::de::DeserializeOwned;
@@ -16,8 +15,8 @@ pub trait Entry: Serialize + DeserializeOwned {
     fn id(&self) -> Option<HashID>;
     /// IDを設定する
     fn set_id(&mut self, id: HashID);
-    /// このエントリのパスを返す
-    fn path(&self, parent: &Path) -> PathBuf;
+    /// このエントリの属性を返す
+    fn attr(&self) -> &Attributes;
 }
 
 /// エントリの実表現
@@ -58,10 +57,10 @@ impl Entry for FsEntry {
         }
     }
 
-    fn path(&self, parent: &Path) -> PathBuf {
+    fn attr(&self) -> &Attributes {
         match self {
-            FsEntry::Dir(ref x) => x.path(parent),
-            FsEntry::File(ref x) => x.path(parent),
+            FsEntry::Dir(ref x) => x.attr(),
+            FsEntry::File(ref x) => x.attr(),
         }
     }
 }
@@ -73,13 +72,18 @@ pub struct DirEntry {
     #[serde(default)]
     id: Option<HashID>,
     attr: Attributes,
-    childlen: Vec<FsHash>,
+    children: Vec<FsHash>,
 }
 
 impl DirEntry {
+    /// 子エントリのイテレータを返す。
+    pub fn children(&self) -> impl Iterator<Item = &FsHash> {
+        self.children.iter()
+    }
+
     /// 指定された名前の子エントリを取得する。
     pub fn find_child(&self, name: &str) -> Option<&FsHash> {
-        for ch in &self.childlen {
+        for ch in &self.children {
             if ch.attr().name() == name {
                 return Some(ch);
             }
@@ -113,15 +117,15 @@ impl Entry for DirEntry {
         self.id = Some(id);
     }
 
-    fn path(&self, parent: &Path) -> PathBuf {
-        parent.join(self.attr.name.to_owned())
+    fn attr(&self) -> &Attributes {
+        &self.attr
     }
 }
 
 /// [`DirEntry`](struct.DirEntry.html)のBuilder
 pub struct DirEntryBuilder {
     attr: Attributes,
-    childlen: Vec<FsHash>,
+    children: Vec<FsHash>,
 }
 
 impl DirEntryBuilder {
@@ -129,23 +133,23 @@ impl DirEntryBuilder {
     pub fn new(attr: Attributes) -> DirEntryBuilder {
         DirEntryBuilder {
             attr,
-            childlen: Vec::new(),
+            children: Vec::new(),
         }
     }
 
     /// 子エントリのIDを追加する。
     pub fn append(&mut self, ch: FsHash) {
-        self.childlen.push(ch);
+        self.children.push(ch);
     }
 
     /// 正規化された[`DirEntry`](struct.DirEntry.html)を生成する。
     pub fn build(mut self) -> DirEntry {
-        self.childlen.sort();
+        self.children.sort();
 
         DirEntry {
             id: None,
             attr: self.attr,
-            childlen: self.childlen,
+            children: self.children,
         }
     }
 }
@@ -175,8 +179,8 @@ impl Entry for FileEntry {
         self.id = Some(id);
     }
 
-    fn path(&self, parent: &Path) -> PathBuf {
-        parent.join(self.attr.name.to_owned())
+    fn attr(&self) -> &Attributes {
+        &self.attr
     }
 }
 

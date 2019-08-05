@@ -13,7 +13,7 @@ use tempfile::tempfile;
 const BUFFER_SIZE: usize = 4096;
 
 /// エントリのSHA3-256ハッシュID
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct HashID(String);
 
 impl HashID {
@@ -23,6 +23,11 @@ impl HashID {
     pub fn parts(&self) -> (&str, &str, &str) {
         let s = self.0.as_str();
         (&s[0..4], &s[4..8], &s[8..])
+    }
+
+    /// 文字列表現への参照を返す。
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
 }
 

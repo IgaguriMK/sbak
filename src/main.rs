@@ -46,15 +46,14 @@ fn w_main() -> Result<()> {
 
     let matches = app.get_matches();
 
-    let cmd_verbose = matches.occurrences_of("verbose") as usize;
-    if cmd_verbose > 0 {
-        config.set_verbose(VerboseLevel::from_v_count(cmd_verbose));
-        config.apply_verbose();
-    }
-
     if let Some(extra_config_file) = matches.value_of("config") {
         let extra_config = load(extra_config_file)?;
         config = config.merged(&extra_config);
+    }
+
+    let cmd_verbose = matches.occurrences_of("verbose") as usize;
+    if cmd_verbose > 0 {
+        config.set_verbose(VerboseLevel::from_v_count(cmd_verbose));
     }
 
     config.apply_verbose();

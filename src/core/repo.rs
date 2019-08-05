@@ -304,7 +304,20 @@ impl<'a> Bank<'a> {
         Ok(res)
     }
 
-    /// バックアップ対象ディレクトリのパスを取得する
+    /// 指定されたハッシュ値のプレフィックスを持つ履歴の一覧を返す。
+    pub fn find_hash(&self, hash_prefix: &str) -> Result<Vec<History>, Error> {
+        let mut res = Vec::new();
+
+        for h in self.histories()? {
+            if h.id().as_str().starts_with(hash_prefix) {
+                res.push(h);
+            }
+        }
+
+        Ok(res)
+    }
+
+    /// バックアップ対象ディレクトリのパスを取得する。
     pub fn target_path(&self) -> &Path {
         &self.config.target_path
     }

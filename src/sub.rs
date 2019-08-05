@@ -11,6 +11,7 @@ mod backup;
 mod history;
 mod info;
 mod init;
+mod restore;
 
 /// サブコマンドを表現するトレイト
 pub trait SubCmd {
@@ -34,6 +35,7 @@ pub fn sub_commands() -> SubCommandSet {
     set.append(history::new());
     set.append(init::new());
     set.append(info::new());
+    set.append(restore::new());
 
     set
 }
