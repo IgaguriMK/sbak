@@ -36,7 +36,12 @@ impl SubCmd for Repo {
     fn command_args(&self) -> App {
         SubCommand::with_name(self.name())
             .about("create or initialize repository")
-            .arg(Arg::with_name("path").required(true))
+            .arg(
+                Arg::with_name("path")
+                    .short("p")
+                    .long("path")
+                    .required(true),
+            )
     }
 
     fn exec(&self, matches: &ArgMatches, config: Config) -> ! {
