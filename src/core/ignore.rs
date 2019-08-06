@@ -61,13 +61,32 @@ impl EntryPath {
     }
 }
 
+/// 除外ファイルの1パターンを表す。
+pub struct Pattern {
+    parts: Vec<PatternPart>,
+}
+
+enum PatternPart {
+    Normal(NamePattern)
+}
+
+struct NamePattern {
+    parts: Vec<NamePatternPart>,
+}
+
+enum NamePatternPart {
+    Str(String),
+    AnyChar,
+    AnyStr,
+}
+
 type Result<T> = std::result::Result<T, Error>;
 
 /// ファイルの除外判定で発生しうるエラー
 #[derive(Debug, Fail)]
 pub enum Error {
     /// 入出力エラーが発生した。
-    #[fail(display = "failed scan with IO error: {}", _0)]
+    #[fail(display = "failed with IO error: {}", _0)]
     IO(#[fail(cause)] io::Error),
 
     /// エントリのパスがバックアップ対象のルートの子ではない。
