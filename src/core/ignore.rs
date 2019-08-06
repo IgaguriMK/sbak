@@ -1,5 +1,7 @@
 //! ファイル除外パターンを扱う
 
+pub mod pattern;
+
 use std::ffi::OsString;
 use std::io;
 use std::path::{Component, Path, PathBuf};
@@ -59,25 +61,6 @@ impl EntryPath {
     pub fn parts(&self) -> &[String] {
         &self.parts
     }
-}
-
-/// 除外ファイルの1パターンを表す。
-pub struct Pattern {
-    parts: Vec<PatternPart>,
-}
-
-enum PatternPart {
-    Normal(NamePattern)
-}
-
-struct NamePattern {
-    parts: Vec<NamePatternPart>,
-}
-
-enum NamePatternPart {
-    Str(String),
-    AnyChar,
-    AnyStr,
 }
 
 type Result<T> = std::result::Result<T, Error>;
