@@ -3,6 +3,7 @@ use super::*;
 use std::path::PathBuf;
 
 #[test]
+#[cfg(target_os = "windows")]
 fn test_entry_path_new_sucess_with_absolute_path_win() {
     let root = PathBuf::from("\\\\?\\C:\\Users\\test\\Documents\\important");
     let entry =
@@ -30,6 +31,7 @@ fn test_entry_path_new_sucess_with_absolute_path_unix() {
 }
 
 #[test]
+#[cfg(target_os = "windows")]
 fn test_entry_path_new_sucess_with_relative_path_win() {
     let root = PathBuf::from("important");
     let entry = PathBuf::from("important\\some_dir\\an_file.txt");
@@ -56,6 +58,7 @@ fn test_entry_path_new_sucess_with_relative_path_unix() {
 }
 
 #[test]
+#[cfg(target_os = "windows")]
 fn test_entry_path_new_sucess_with_root_win() {
     let root = PathBuf::from("\\\\?\\C:\\Users\\test\\Documents\\important");
     let entry = PathBuf::from("\\\\?\\C:\\Users\\test\\Documents\\important");
