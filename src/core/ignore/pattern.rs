@@ -6,31 +6,62 @@ use failure::Fail;
 mod test;
 
 /// パターンのリストを表す。
+#[derive(Debug, Clone)]
 pub struct Patterns {
     patterns: Vec<Pattern>,
 }
 
 /// 除外ファイルの1パターンを表す。
+#[derive(Debug, Clone)]
 pub struct Pattern {
     parts: Vec<PatternPart>,
     allow: bool,
 }
 
+#[derive(Debug, Clone)]
 enum PatternPart {
     Normal(NamePattern),
 }
 
+#[derive(Debug, Clone)]
 struct NamePattern {
     parts: Vec<NamePatternPart>,
 }
 
 impl NamePattern {
-    fn parse(pattern_str: &str) -> Result<NamePattern> {
-        let mut parts = Vec::new();
+    // 正規化処理をするので`new`ではなく`from_parts`という名前
+    fn from_parts(mut parts: Vec<NamePatternPart>) -> NamePattern {
+        let mut normalized_parts = Vec::with_capacity(parts.len());
 
-        loop {}
+        // 先頭の要素から取り出しながら正規化処理をする。
+        parts.reverse();
+        while parts.len() >= 2 {
+            let current = parts.pop().unwrap();
+            let next = parts.pop().unwrap();
+            match (current, next) {
+                // 文字列指定が連続
+                (NamePatternPart::Str(mut s1), NamePatternPart::Str(s2)) => {
+                    s1.push_str(&s2);
+                    parts.push(NamePatternPart::Str(s1)); // 入力列に戻して正規化続行
+                }
+                // ワイルドカードが連続
+                (NamePatternPart::AnyStr, NamePatternPart::AnyStr) => {
+                    parts.push(NamePatternPart::AnyStr);
+                }
+                // 既に正規
+                (current, next) => {
+                    normalized_parts.push(current);
+                    parts.push(next);
+                }
+            }
+        }
+        if let Some(last_part) = parts.pop() {
+            normalized_parts.push(last_part);
+        }
 
-        Ok(NamePattern { parts })
+        NamePattern {
+            parts: normalized_parts,
+        }
     }
 
     fn match_str(&self, s: &str) -> bool {
@@ -51,7 +82,8 @@ fn match_np(parts: &[NamePatternPart], s: &str) -> bool {
         NamePatternPart::Str(ref ps) => {
             // 単純な文字列へのマッチ
             if s.starts_with(ps) {
-                let left_s = s.trim_start_matches(ps);
+                // trim_start_matches は複数回取り除いてしまうので不可。
+                let (_, left_s) = s.split_at(ps.len());
                 return match_np(left_parts, left_s);
             } else {
                 return false;
@@ -101,6 +133,7 @@ fn trim_char(s: &str) -> &str {
     return "";
 }
 
+#[derive(Debug, Clone)]
 enum NamePatternPart {
     Str(String),
     AnyChar,
