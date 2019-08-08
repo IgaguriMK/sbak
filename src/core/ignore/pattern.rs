@@ -1,29 +1,155 @@
 //! 除外ファイルのパターンを表す。
 
-use failure::Fail;
+mod parser;
+
+use super::EntryPath;
 
 #[cfg(test)]
 mod test;
 
+pub use parser::{parse, Error as ParseError};
+
 /// パターンのリストを表す。
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Patterns {
     patterns: Vec<Pattern>,
 }
 
+impl Patterns {
+    fn new(patterns: Vec<Pattern>) -> Patterns {
+        Patterns { patterns }
+    }
+
+    /// エントリがパターンにマッチするか検査する。
+    pub fn matches(&self, entry_path: &EntryPath) -> Match {
+        for pat in self.patterns.iter().rev() {
+            eprintln!("pat = {:?}", pat);
+            match pat.matches(entry_path) {
+                Match::Allowed => return Match::Allowed,
+                Match::Ignored => return Match::Ignored,
+                _ => {}
+            }
+        }
+        Match::Parent
+    }
+}
+
 /// 除外ファイルの1パターンを表す。
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Pattern {
     parts: Vec<PatternPart>,
     allow: bool,
+    dir_only: bool,
 }
 
-#[derive(Debug, Clone)]
+impl Pattern {
+    /// エントリがパターンにマッチするか検査する。
+    pub fn matches(&self, entry_path: &EntryPath) -> Match {
+        if self.dir_only && !entry_path.is_dir {
+            return Match::Parent;
+        }
+
+        if match_path(&self.parts, entry_path.parts()) {
+            if self.allow {
+                Match::Allowed
+            } else {
+                Match::Ignored
+            }
+        } else {
+            Match::Parent
+        }
+    }
+
+    fn from_parts(
+        allow: bool,
+        cascade: bool,
+        dir_only: bool,
+        mut parts: Vec<PatternPart>,
+    ) -> Pattern {
+        let mut normalized_parts = Vec::with_capacity(parts.len());
+
+        if cascade {
+            normalized_parts.push(PatternPart::AnyPath);
+        }
+
+        // 先頭の要素から取り出しながら正規化処理をする。
+        parts.reverse();
+        while parts.len() >= 2 {
+            let current = parts.pop().unwrap();
+            let next = parts.pop().unwrap();
+            match (current, next) {
+                // ワイルドカードが連続
+                (PatternPart::AnyPath, PatternPart::AnyPath) => {
+                    parts.push(PatternPart::AnyPath);
+                }
+                // 既に正規
+                (current, next) => {
+                    normalized_parts.push(current);
+                    parts.push(next);
+                }
+            }
+        }
+        if let Some(last_part) = parts.pop() {
+            normalized_parts.push(last_part);
+        }
+
+        Pattern {
+            parts: normalized_parts,
+            allow,
+            dir_only,
+        }
+    }
+}
+
+fn match_path(parts: &[PatternPart], path: &[String]) -> bool {
+    if parts.is_empty() {
+        return path.is_empty();
+    }
+
+    let p = &parts[0];
+    let left_parts = &parts[1..];
+
+    match p {
+        PatternPart::Normal(pat) => {
+            if let Some(ref s) = path.first() {
+                if !pat.match_str(s) {
+                    return false;
+                }
+                let left_path = &path[1..];
+                return match_path(left_parts, left_path);
+            }
+            false
+        }
+        PatternPart::AnyPath => {
+            for drop_cnt in 0..path.len() {
+                let left_path = &path[drop_cnt..];
+                if match_path(left_parts, left_path) {
+                    return true;
+                }
+            }
+            false
+        }
+    }
+}
+
+/// 除外パターンのマッチ結果を表す。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Match {
+    /// 明示的に除外対象に指定されている。
+    Ignored,
+    /// 親ディレクトリの除外設定に従う。
+    Parent,
+    /// 明示的に許可されている。
+    Allowed,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 enum PatternPart {
     Normal(NamePattern),
+    AnyPath,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 struct NamePattern {
     parts: Vec<NamePatternPart>,
 }
@@ -84,9 +210,9 @@ fn match_np(parts: &[NamePatternPart], s: &str) -> bool {
             if s.starts_with(ps) {
                 // trim_start_matches は複数回取り除いてしまうので不可。
                 let (_, left_s) = s.split_at(ps.len());
-                return match_np(left_parts, left_s);
+                match_np(left_parts, left_s)
             } else {
-                return false;
+                false
             }
         }
         NamePatternPart::AnyChar => {
@@ -95,7 +221,7 @@ fn match_np(parts: &[NamePatternPart], s: &str) -> bool {
                 return false;
             }
             let left_s = trim_char(s);
-            return match_np(left_parts, left_s);
+            match_np(left_parts, left_s)
         }
         NamePatternPart::AnyStr => {
             // 最後のパーツなら自明にマッチ成功
@@ -114,7 +240,7 @@ fn match_np(parts: &[NamePatternPart], s: &str) -> bool {
                 left_s = trim_char(left_s);
             }
             // まだパターンのパーツがあり、全てのケースで失敗したので失敗。
-            return false;
+            false
         }
     }
 }
@@ -130,22 +256,19 @@ fn trim_char(s: &str) -> &str {
         i += 1;
     }
     // 文字列が空でなく文字区切りが見つからないので、残っているのは1文字であるから、空文字列を返す。
-    return "";
+    ""
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 enum NamePatternPart {
     Str(String),
     AnyChar,
     AnyStr,
 }
 
-type Result<T> = std::result::Result<T, Error>;
-
-/// パターン操作で発生しうるエラー
-#[derive(Debug, Fail)]
-pub enum Error {
-    /// パターン表現の文字列が不正である。
-    #[fail(display = "invalid pattern string: {}", _0)]
-    InvalidPattern(String),
+impl NamePatternPart {
+    #[cfg(test)]
+    fn s(s: &str) -> NamePatternPart {
+        NamePatternPart::Str(s.to_owned())
+    }
 }
