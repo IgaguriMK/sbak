@@ -1,8 +1,16 @@
+use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read};
+use std::path::Path;
 
 use failure::Fail;
 
 use super::*;
+
+/// 除外パターンファイルを読み込む。
+pub fn load_patterns<P: AsRef<Path>>(path: P) -> Result<Patterns> {
+    let f = File::open(path)?;
+    parse(f)
+}
 
 /// パターンのリストをパースする。
 ///

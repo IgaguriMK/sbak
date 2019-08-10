@@ -12,6 +12,7 @@ use serde_json::{self, from_reader, to_writer};
 
 use crate::core::entry::DirEntry;
 use crate::core::hash::{self, HashID};
+use crate::core::ignore::pattern::{self, load_patterns, Patterns};
 use crate::core::timestamp::Timestamp;
 
 const BANK_CONFIG_FILE: &str = "config.json";
@@ -322,6 +323,17 @@ impl<'a> Bank<'a> {
         &self.config.target_path
     }
 
+    /// `Bank`で指定されている除外リストを読み込む。
+    pub fn load_ignore_patterns(&self) -> Result<Patterns, Error> {
+        let path = self.ignore_file();
+
+        if path.exists() {
+            Ok(load_patterns(path)?)
+        } else {
+            Ok(Patterns::default())
+        }
+    }
+
     fn create(&self) -> Result<(), Error> {
         ensure_dir(&self.path)?;
         ensure_dir(&self.history_dir())?;
@@ -338,6 +350,10 @@ impl<'a> Bank<'a> {
 
     fn last_scan_file(&self) -> PathBuf {
         self.path.join("last_scan.json")
+    }
+
+    fn ignore_file(&self) -> PathBuf {
+        self.path.join("ignore")
     }
 }
 
@@ -392,6 +408,10 @@ pub enum Error {
     #[fail(display = "object not exists: {}", _0)]
     EntryNotFound(HashID),
 
+    /// 除外リストの読み込みに失敗した
+    #[fail(display = "failed load ignore patterns: {}", _0)]
+    IgnorePattern(#[fail(cause)] pattern::ParseError),
+
     /// リポジトリが不完全な状態である
     #[fail(display = "repository isn't complete: {} is {}", _0, _1)]
     IncompleteRepo(&'static str, &'static str),
@@ -413,15 +433,15 @@ pub enum Error {
     Parse(#[fail(cause)] serde_json::Error),
 }
 
-impl From<io::Error> for Error {
-    fn from(e: io::Error) -> Error {
-        Error::IO(e)
+impl From<pattern::ParseError> for Error {
+    fn from(e: pattern::ParseError) -> Error {
+        Error::IgnorePattern(e)
     }
 }
 
-impl From<serde_json::Error> for Error {
-    fn from(e: serde_json::Error) -> Error {
-        Error::Parse(e)
+impl From<io::Error> for Error {
+    fn from(e: io::Error) -> Error {
+        Error::IO(e)
     }
 }
 
@@ -430,5 +450,11 @@ impl From<hash::Error> for Error {
         match e {
             hash::Error::IO(e) => Error::IO(e),
         }
+    }
+}
+
+impl From<serde_json::Error> for Error {
+    fn from(e: serde_json::Error) -> Error {
+        Error::Parse(e)
     }
 }

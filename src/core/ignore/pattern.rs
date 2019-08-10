@@ -7,10 +7,10 @@ use super::EntryPath;
 #[cfg(test)]
 mod test;
 
-pub use parser::{parse, Error as ParseError};
+pub use parser::{load_patterns, parse, Error as ParseError};
 
 /// パターンのリストを表す。
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct Patterns {
     patterns: Vec<Pattern>,
 }
