@@ -6,6 +6,7 @@ use std::time::{SystemTime, SystemTimeError, UNIX_EPOCH};
 
 use chrono::NaiveDateTime;
 use failure::Fail;
+use filetime::FileTime;
 use serde::{Deserialize, Serialize};
 
 /// 秒精度のタイムスタンプ
@@ -47,8 +48,13 @@ impl fmt::Display for Timestamp {
     }
 }
 
-#[allow(missing_docs)]
-pub type Result<T> = std::result::Result<T, Error>;
+impl Into<FileTime> for Timestamp {
+    fn into(self) -> FileTime {
+        FileTime::from_unix_time(self.0 as i64, 0)
+    }
+}
+
+type Result<T> = std::result::Result<T, Error>;
 
 /// タイムスタンプ操作に関わるエラー
 #[derive(Debug, Fail)]

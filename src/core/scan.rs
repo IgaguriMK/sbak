@@ -11,6 +11,7 @@ use serde_json::to_writer;
 
 use crate::core::entry::*;
 use crate::core::hash::{self, hash_reader, HashID};
+use crate::core::ignore::{self, IgnoreStack};
 use crate::core::repo::{self, Bank};
 use crate::core::timestamp;
 
@@ -34,13 +35,22 @@ impl<'a> Scanner<'a> {
         trace!("last_scan root entry id = {:?}", last_id);
         let attr = convert_metadata(path, &fs::metadata(path)?)?;
 
+        trace!("load ing bank ignore patterns");
+        let ignore_patterns = self.bank.load_ignore_patterns()?;
+        let ignore_stack = IgnoreStack::new(path, ignore_patterns);
+
         trace!("start scan root dir");
-        let id = self.scan_dir(path, attr, last_id)?;
+        let id = self.scan_dir(path, &ignore_stack, attr, last_id)?;
 
         Ok(id)
     }
 
-    fn scan_i(&self, p: &Path, last_entry: Option<&FsHash>) -> Result<FsHash> {
+    fn scan_i(
+        &self,
+        p: &Path,
+        ignore_stack: &IgnoreStack,
+        last_entry: Option<&FsHash>,
+    ) -> Result<FsHash> {
         info!("{:?}", p);
         let fs_meta = fs::metadata(p)?;
         let attr = convert_metadata(p, &fs_meta)?;
@@ -48,7 +58,7 @@ impl<'a> Scanner<'a> {
 
         if fs_meta.is_dir() {
             trace!("{:?} is dir.", p);
-            Ok(self.scan_dir(p, attr, last_entry.map(|x| x.id()))?)
+            Ok(self.scan_dir(p, ignore_stack, attr, last_entry.map(|x| x.id()))?)
         } else if fs_meta.is_file() {
             trace!("{:?} is file.", p);
             let old_hash = last_entry.and_then(|h| h.clone().try_into().ok());
@@ -59,7 +69,13 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    fn scan_dir(&self, p: &Path, attr: Attributes, last_id: Option<HashID>) -> Result<FsHash> {
+    fn scan_dir(
+        &self,
+        p: &Path,
+        ignore_stack: &IgnoreStack,
+        attr: Attributes,
+        last_id: Option<HashID>,
+    ) -> Result<FsHash> {
         trace!("scan dir {:?}", p);
         let old_entry = if let Some(ref id) = last_id {
             trace!("dir has last_id = {}", id);
@@ -68,6 +84,8 @@ impl<'a> Scanner<'a> {
             trace!("dir has no last_id");
             DirEntryBuilder::new(attr.clone()).build()
         };
+
+        let current_stack = ignore_stack.child(attr.name().to_owned())?;
 
         let mut builder = DirEntryBuilder::new(attr);
 
@@ -79,7 +97,14 @@ impl<'a> Scanner<'a> {
                 .into_string()
                 .map_err(|_| Error::NameIsInvalidUnicode(ch.path().to_owned()))?;
             trace!("child name = {}", name);
-            let ch_hash = self.scan_i(&ch.path(), old_entry.find_child(&name))?;
+
+            let fs_meta = fs::metadata(p)?;
+            if current_stack.ignored(&ch.path(), fs_meta.is_dir())? {
+                trace!("ignore {:?}", ch.path());
+                continue;
+            }
+
+            let ch_hash = self.scan_i(&ch.path(), &current_stack, old_entry.find_child(&name))?;
             builder.append(ch_hash);
         }
         trace!("finish scan dir children: {:?}", p);
@@ -108,6 +133,7 @@ impl<'a> Scanner<'a> {
         last_entry: Option<FileHash>,
     ) -> Result<FsHash> {
         trace!("scan file {:?}", p);
+
         if let Some(last_entry) = last_entry {
             if last_entry.attr().modified() == attr.modified() {
                 trace!("skip scan file {:?}", p);
@@ -156,6 +182,10 @@ pub enum Error {
     #[fail(display = "failed parse FsEntry: {}", _0)]
     Encode(#[fail(cause)] serde_json::Error),
 
+    /// 除外判定に失敗した。
+    #[fail(display = "failed load ignore patterns: {}", _0)]
+    Ignore(#[fail(cause)] ignore::Error),
+
     /// 入出力エラー
     #[fail(display = "failed scan with IO error: {}", _0)]
     IO(#[fail(cause)] io::Error),
@@ -175,6 +205,12 @@ pub enum Error {
     /// 対応範囲外のタイムスタンプを検出
     #[fail(display = "timestamp is older than UNIX epoch")]
     Timestamp,
+}
+
+impl From<ignore::Error> for Error {
+    fn from(e: ignore::Error) -> Error {
+        Error::Ignore(e)
+    }
 }
 
 impl From<io::Error> for Error {

@@ -40,6 +40,7 @@ impl SubCmd for Repo {
                 Arg::with_name("path")
                     .short("p")
                     .long("path")
+                    .takes_value(true)
                     .required(true),
             )
     }
