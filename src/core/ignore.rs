@@ -5,6 +5,7 @@ pub mod pattern;
 use std::ffi::OsString;
 use std::path::{Component, Path, PathBuf};
 
+use log::trace;
 use pattern::{load_patterns, Match, Patterns};
 
 use failure::Fail;
@@ -66,6 +67,7 @@ impl EntryPath {
 }
 
 /// 除外判定の設定を親ディレクトリに遡るためのスタック。
+#[derive(Debug, Clone)]
 pub struct IgnoreStack<'a> {
     root_path: PathBuf,
     parent: Option<&'a IgnoreStack<'a>>,
@@ -95,7 +97,7 @@ impl<'a> IgnoreStack<'a> {
         };
 
         // 除外設定を読み込み
-        let ignore_file = self.root_path.join(IGNORE_FILE);
+        let ignore_file = root_path.join(IGNORE_FILE);
         let current_patterns = if ignore_file.exists() {
             load_patterns(&ignore_file)?
         } else {
@@ -116,7 +118,9 @@ impl<'a> IgnoreStack<'a> {
         match self.current_patterns.matches(&entry_path) {
             Match::Allowed => return Ok(false),
             Match::Ignored => return Ok(true),
-            _ => {}
+            _ => {
+                trace!("STACK not match {:?} at {:?}", path, self.root_path);
+            }
         }
 
         if let Some(parent) = self.parent {

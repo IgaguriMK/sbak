@@ -92,6 +92,7 @@ impl<'a> Scanner<'a> {
         };
 
         let current_stack = ignore_stack.child(attr.name().to_owned())?;
+        trace!("IGNORE STACK = {:?}", current_stack);
 
         let mut builder = DirEntryBuilder::new(attr);
 

@@ -3,4 +3,5 @@
 
 /sample-*
 *.json
+*.txt
 /.sbak.toml
