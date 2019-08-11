@@ -6,7 +6,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use failure::Fail;
-use log::{info, trace};
+use log::{info, trace, warn};
 use serde_json::to_writer;
 
 use crate::core::entry::*;
@@ -50,22 +50,28 @@ impl<'a> Scanner<'a> {
         p: &Path,
         ignore_stack: &IgnoreStack,
         last_entry: Option<&FsHash>,
-    ) -> Result<FsHash> {
+    ) -> Result<Option<FsHash>> {
         info!("{:?}", p);
-        let fs_meta = fs::metadata(p)?;
+        let fs_meta = fs::symlink_metadata(p)?;
         let attr = convert_metadata(p, &fs_meta)?;
         trace!("{:?}: {:?}", p, attr);
 
-        if fs_meta.is_dir() {
+        let file_type = fs_meta.file_type();
+        if file_type.is_dir() {
             trace!("{:?} is dir.", p);
-            Ok(self.scan_dir(p, ignore_stack, attr, last_entry.map(|x| x.id()))?)
-        } else if fs_meta.is_file() {
+            let dir_hash = self.scan_dir(p, ignore_stack, attr, last_entry.map(|x| x.id()))?;
+            Ok(Some(dir_hash))
+        } else if file_type.is_file() {
             trace!("{:?} is file.", p);
             let old_hash = last_entry.and_then(|h| h.clone().try_into().ok());
             let file_hash = self.scan_file(p, attr, old_hash)?;
-            Ok(file_hash)
+            Ok(Some(file_hash))
+        } else if file_type.is_symlink() {
+            let symlink_hash = self.scan_symlink(p, attr)?;
+            Ok(Some(symlink_hash))
         } else {
-            panic!("{:?} is not dir nor file", p)
+            warn!("{:?} is not dir nor file", p);
+            Ok(None)
         }
     }
 
@@ -79,7 +85,7 @@ impl<'a> Scanner<'a> {
         trace!("scan dir {:?}", p);
         let old_entry = if let Some(ref id) = last_id {
             trace!("dir has last_id = {}", id);
-            self.bank.load_dir_entry(id)?
+            self.bank.load_entry(id)?
         } else {
             trace!("dir has no last_id");
             DirEntryBuilder::new(attr.clone()).build()
@@ -104,8 +110,11 @@ impl<'a> Scanner<'a> {
                 continue;
             }
 
-            let ch_hash = self.scan_i(&ch.path(), &current_stack, old_entry.find_child(&name))?;
-            builder.append(ch_hash);
+            if let Some(ch_hash) =
+                self.scan_i(&ch.path(), &current_stack, old_entry.find_child(&name))?
+            {
+                builder.append(ch_hash);
+            }
         }
         trace!("finish scan dir children: {:?}", p);
 
@@ -150,6 +159,35 @@ impl<'a> Scanner<'a> {
         trace!("start save file object {}", id);
         self.bank.save_object(&id, temp)?;
         trace!("finish save file object {}", id);
+
+        entry.set_id(id.clone());
+
+        Ok(FsHash::try_from(entry).unwrap())
+    }
+
+    fn scan_symlink(&self, p: &Path, attr: Attributes) -> Result<FsHash> {
+        trace!("scan symlink {:?}", p);
+
+        let target = fs::read_link(p)?;
+        info!("symlink: {:?} => {:?}", p, target);
+        let target_path_str = target
+            .to_str()
+            .ok_or_else(|| Error::NameIsInvalidUnicode(target.to_owned()))?
+            .to_owned();
+
+        let target_meta = fs::metadata(p)?;
+
+        let mut entry = SymlinkEntry::new(attr, target_path_str, target_meta.is_dir());
+
+        trace!("start encode dir entry {:?}", p);
+        let mut encoded = Vec::<u8>::new();
+        to_writer(&mut encoded, &entry)?;
+
+        trace!("start hash symlink entry {:?}", p);
+        let (id, temp) = hash_reader(encoded.as_slice())?;
+        trace!("start save symlink entry {:?} = {}", p, id);
+        self.bank.save_object(&id, temp)?;
+        trace!("symlink entry saved {:?} = {}", p, id);
 
         entry.set_id(id.clone());
 

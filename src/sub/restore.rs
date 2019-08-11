@@ -67,6 +67,11 @@ impl Restore {
             exit(1);
         }
 
+        let symlinks = extender.symlinks();
+        if matches.is_present("show_symlinks") {
+            symlinks.show();
+        }
+
         Ok(())
     }
 }
@@ -119,6 +124,11 @@ impl SubCmd for Restore {
                     .short("R")
                     .long("remove")
                     .help("Remove existing files if not contained in backup."),
+            )
+            .arg(
+                Arg::with_name("show_symlinks")
+                    .long("show-symlinks")
+                    .help("Show symbolic link list"),
             )
     }
 

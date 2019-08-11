@@ -1,6 +1,7 @@
 //!ファイルシステムのスキャン結果の表現
 
 use std::convert::{TryFrom, TryInto};
+use std::path::PathBuf;
 
 use failure::Fail;
 use serde::de::DeserializeOwned;
@@ -28,6 +29,9 @@ pub enum FsEntry {
     /// ファイル
     #[serde(rename = "file")]
     File(FileEntry),
+    /// シンボリックリンク
+    #[serde(rename = "symlink")]
+    Symlink(SymlinkEntry),
 }
 
 impl From<DirEntry> for FsEntry {
@@ -47,6 +51,7 @@ impl Entry for FsEntry {
         match self {
             FsEntry::Dir(ref x) => x.id(),
             FsEntry::File(ref x) => x.id(),
+            FsEntry::Symlink(ref x) => x.id(),
         }
     }
 
@@ -54,6 +59,7 @@ impl Entry for FsEntry {
         match self {
             FsEntry::Dir(ref mut x) => x.set_id(id),
             FsEntry::File(ref mut x) => x.set_id(id),
+            FsEntry::Symlink(ref mut x) => x.set_id(id),
         }
     }
 
@@ -61,6 +67,7 @@ impl Entry for FsEntry {
         match self {
             FsEntry::Dir(ref x) => x.attr(),
             FsEntry::File(ref x) => x.attr(),
+            FsEntry::Symlink(ref x) => x.attr(),
         }
     }
 }
@@ -184,6 +191,53 @@ impl Entry for FileEntry {
     }
 }
 
+/// シンボリックリンクの各種情報
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SymlinkEntry {
+    #[serde(skip_serializing)]
+    #[serde(default)]
+    id: Option<HashID>,
+    attr: Attributes,
+    target: String,
+    is_dir: bool,
+}
+
+impl SymlinkEntry {
+    /// 新たなシンボリックリンクエントリを生成する。
+    pub fn new(attr: Attributes, target: String, is_dir: bool) -> SymlinkEntry {
+        SymlinkEntry {
+            id: None,
+            attr,
+            target,
+            is_dir,
+        }
+    }
+
+    /// シンボリックリンクのターゲットパスを返す。
+    pub fn target(&self) -> PathBuf {
+        PathBuf::from(&self.target)
+    }
+
+    /// シンボリックリンクがディレクトリを指すかどうかを返す。
+    pub fn is_dir(&self) -> bool {
+        self.is_dir
+    }
+}
+
+impl Entry for SymlinkEntry {
+    fn id(&self) -> Option<HashID> {
+        self.id.clone()
+    }
+
+    fn set_id(&mut self, id: HashID) {
+        self.id = Some(id);
+    }
+
+    fn attr(&self) -> &Attributes {
+        &self.attr
+    }
+}
+
 /// ファイルやディレクトリの属性
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Attributes {
@@ -227,6 +281,8 @@ pub enum FsHash {
     Dir(DirHash),
     #[serde(rename = "file")]
     File(FileHash),
+    #[serde(rename = "symlink")]
+    Symlink(SymlinkHash),
 }
 
 impl FsHash {
@@ -235,6 +291,7 @@ impl FsHash {
         match self {
             FsHash::Dir(x) => x.id(),
             FsHash::File(x) => x.id(),
+            FsHash::Symlink(x) => x.id(),
         }
     }
 
@@ -243,6 +300,7 @@ impl FsHash {
         match self {
             FsHash::Dir(x) => x.attr(),
             FsHash::File(x) => x.attr(),
+            FsHash::Symlink(x) => x.attr(),
         }
     }
 }
@@ -263,6 +321,14 @@ impl TryFrom<FileEntry> for FsHash {
     }
 }
 
+impl TryFrom<SymlinkEntry> for FsHash {
+    type Error = NoIdError;
+
+    fn try_from(e: SymlinkEntry) -> Result<Self, Self::Error> {
+        e.try_into().map(FsHash::Symlink)
+    }
+}
+
 impl From<DirHash> for FsHash {
     fn from(x: DirHash) -> FsHash {
         FsHash::Dir(x)
@@ -272,6 +338,12 @@ impl From<DirHash> for FsHash {
 impl From<FileHash> for FsHash {
     fn from(x: FileHash) -> FsHash {
         FsHash::File(x)
+    }
+}
+
+impl From<SymlinkHash> for FsHash {
+    fn from(x: SymlinkHash) -> FsHash {
+        FsHash::Symlink(x)
     }
 }
 
@@ -354,6 +426,48 @@ impl TryFrom<FsHash> for FileHash {
     fn try_from(h: FsHash) -> Result<Self, Self::Error> {
         match h {
             FsHash::File(x) => Ok(x),
+            h => Err(MismatchHashType(h)),
+        }
+    }
+}
+
+/// シンボリックリンクを表すディレクトリの子エントリ
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct SymlinkHash {
+    attr: Attributes,
+    id: HashID,
+}
+
+impl SymlinkHash {
+    /// ハッシュ値を取得する。
+    pub fn id(&self) -> HashID {
+        self.id.clone()
+    }
+
+    /// Attributesを取得する。
+    pub fn attr(&self) -> &Attributes {
+        &self.attr
+    }
+}
+
+impl TryFrom<SymlinkEntry> for SymlinkHash {
+    type Error = NoIdError;
+
+    fn try_from(e: SymlinkEntry) -> Result<Self, Self::Error> {
+        if let Some(id) = e.id() {
+            Ok(SymlinkHash { attr: e.attr, id })
+        } else {
+            Err(NoIdError::NoId)
+        }
+    }
+}
+
+impl TryFrom<FsHash> for SymlinkHash {
+    type Error = MismatchHashType;
+
+    fn try_from(h: FsHash) -> Result<Self, Self::Error> {
+        match h {
+            FsHash::Symlink(x) => Ok(x),
             h => Err(MismatchHashType(h)),
         }
     }

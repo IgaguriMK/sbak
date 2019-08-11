@@ -10,7 +10,7 @@ use failure::Fail;
 use filetime::set_file_mtime;
 use log::{info, trace};
 
-use crate::core::entry::{DirEntry, Entry, FileHash, FsHash};
+use crate::core::entry::{DirEntry, Entry, FileHash, FsHash, SymlinkEntry, SymlinkHash};
 use crate::core::repo::{self, Bank, History};
 use crate::core::timestamp::{self, Timestamp};
 
@@ -20,6 +20,7 @@ pub struct Extender<'a> {
     bank: &'a Bank<'a>,
     overwrite: bool,
     remove: bool,
+    symlinks: Symlinks,
 }
 
 impl<'a> Extender<'a> {
@@ -29,6 +30,7 @@ impl<'a> Extender<'a> {
             bank,
             overwrite: false,
             remove: false,
+            symlinks: Symlinks::new(),
         }
     }
 
@@ -43,7 +45,7 @@ impl<'a> Extender<'a> {
     }
 
     /// 指定された`path`に`history`時点のファイルを展開する。
-    pub fn extend<P: AsRef<Path>>(&self, target_path: P, history: &History) -> Result<()> {
+    pub fn extend<P: AsRef<Path>>(&mut self, target_path: P, history: &History) -> Result<()> {
         let path = target_path.as_ref();
         info!(
             "start extend to {:?} from {} {}",
@@ -56,7 +58,7 @@ impl<'a> Extender<'a> {
         Ok(())
     }
 
-    fn extend_dir(&self, path: &Path, dir_entry: &DirEntry) -> Result<()> {
+    fn extend_dir(&mut self, path: &Path, dir_entry: &DirEntry) -> Result<()> {
         info!("extending directory {:?}", path);
         if !path.exists() {
             trace!("create dir {:?}", path);
@@ -76,11 +78,14 @@ impl<'a> Extender<'a> {
 
             match ch {
                 FsHash::Dir(ref dir) => {
-                    let ch_dir = self.bank.load_dir_entry(&dir.id())?;
+                    let ch_dir = self.bank.load_entry(&dir.id())?;
                     self.extend_dir(&ch_path, &ch_dir)?;
                 }
                 FsHash::File(ref file) => {
                     self.extend_file(&ch_path, file)?;
+                }
+                FsHash::Symlink(ref symlink) => {
+                    self.extend_symlink(&ch_path, symlink)?;
                 }
             }
 
@@ -165,6 +170,69 @@ impl<'a> Extender<'a> {
         }
 
         Ok(())
+    }
+
+    fn extend_symlink(&mut self, path: &Path, symlink_hash: &SymlinkHash) -> Result<()> {
+        let symlink_entry: SymlinkEntry = self.bank.load_entry(&symlink_hash.id())?;
+        let symink = Symlink::new(
+            path.to_owned(),
+            symlink_entry.target().to_owned(),
+            symlink_entry.is_dir(),
+        );
+        self.symlinks.add(symink);
+        Ok(())
+    }
+
+    /// シンボリックリンクの一覧を返す。
+    pub fn symlinks(&self) -> &Symlinks {
+        &self.symlinks
+    }
+}
+
+/// シンボリックリンクのリスト
+#[derive(Debug, Clone)]
+pub struct Symlinks {
+    list: Vec<Symlink>,
+}
+
+impl Symlinks {
+    fn new() -> Symlinks {
+        Symlinks { list: Vec::new() }
+    }
+
+    fn add(&mut self, symlink: Symlink) {
+        self.list.push(symlink);
+    }
+
+    /// 標準出力にシンボリックリンクのリストを表示する。
+    pub fn show(&self) {
+        for s in &self.list {
+            s.show();
+        }
+    }
+}
+
+/// シンボリックリンクを表す
+#[derive(Debug, Clone)]
+pub struct Symlink {
+    from: PathBuf,
+    to: PathBuf,
+    is_dir: bool,
+}
+
+impl Symlink {
+    fn new(from: PathBuf, to: PathBuf, is_dir: bool) -> Symlink {
+        Symlink { from, to, is_dir }
+    }
+
+    /// 標準出力にシンボリックリンクの種類、リンク元とリンク先を表示する。
+    pub fn show(&self) {
+        println!(
+            "{}\t{:?}\t{:?}",
+            if self.is_dir { "dir" } else { "file" },
+            self.from,
+            self.to
+        );
     }
 }
 

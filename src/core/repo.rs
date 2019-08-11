@@ -10,7 +10,7 @@ use log::trace;
 use serde::{Deserialize, Serialize};
 use serde_json::{self, from_reader, to_writer};
 
-use crate::core::entry::DirEntry;
+use crate::core::entry::{DirEntry, Entry};
 use crate::core::hash::{self, HashID};
 use crate::core::ignore::pattern::{self, load_patterns, Patterns};
 use crate::core::timestamp::Timestamp;
@@ -249,11 +249,11 @@ impl<'a> Bank<'a> {
 
     /// 指定された時点でのBankのルートディレクトリのエントリを読み込む。
     pub fn load_root(&'a self, history: &History) -> Result<DirEntry, Error> {
-        self.load_dir_entry(&history.id)
+        self.load_entry(&history.id)
     }
 
     /// 指定された`id`のディレクトリエントリを読み込む。
-    pub fn load_dir_entry(&'a self, id: &HashID) -> Result<DirEntry, Error> {
+    pub fn load_entry<E: Entry>(&'a self, id: &HashID) -> Result<E, Error> {
         let f = self.open_object(id)?;
         Ok(from_reader(f)?)
     }
