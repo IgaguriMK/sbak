@@ -130,6 +130,15 @@ impl Repository {
     fn save_object(&self, id: &HashID, mut temp: fs::File) -> Result<(), io::Error> {
         let out_path = self.object_path(id);
 
+        if out_path.exists() {
+            let new_size = temp.metadata()?.len();
+            let old_size = out_path.metadata()?.len();
+            if new_size == old_size {
+                trace!("skip save existing object {}", id);
+                return Ok(());
+            }
+        }
+
         let out_dir = out_path.parent().unwrap();
         fs::create_dir_all(out_dir)?;
 
