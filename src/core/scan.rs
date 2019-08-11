@@ -10,7 +10,7 @@ use log::{info, trace, warn};
 use serde_json::to_writer;
 
 use crate::core::entry::*;
-use crate::core::hash::{self, hash_reader, HashID};
+use crate::core::hash::{self, hash as hash_file, hash_reader, HashID};
 use crate::core::ignore::{self, IgnoreStack};
 use crate::core::repo::{self, Bank};
 use crate::core::timestamp;
@@ -154,11 +154,11 @@ impl<'a> Scanner<'a> {
         let mut entry = FileEntry::new(attr);
 
         trace!("start scan file {:?}", p);
-        let f = fs::File::open(p)?;
-        let (id, temp) = hash_reader(f)?;
+        let mut f = fs::File::open(p)?;
+        let id = hash_file(&mut f)?;
         trace!("file hash {:?} = {}", p, id);
         trace!("start save file object {}", id);
-        self.bank.save_object(&id, temp)?;
+        self.bank.save_object(&id, f)?;
         trace!("finish save file object {}", id);
 
         entry.set_id(id.clone());
