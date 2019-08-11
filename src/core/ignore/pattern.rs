@@ -23,7 +23,6 @@ impl Patterns {
     /// エントリがパターンにマッチするか検査する。
     pub fn matches(&self, entry_path: &EntryPath) -> Match {
         for pat in self.patterns.iter().rev() {
-            eprintln!("pat = {:?}", pat);
             match pat.matches(entry_path) {
                 Match::Allowed => return Match::Allowed,
                 Match::Ignored => return Match::Ignored,
