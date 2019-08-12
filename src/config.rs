@@ -3,14 +3,17 @@
 use std::fs::File;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 #[cfg(target_os = "windows")]
 use std::env;
 
 use failure::Fail;
-use log::LevelFilter;
+use log::{error, LevelFilter};
 use serde::{Deserialize, Serialize};
 use toml::de::{self as toml_de, from_slice};
+
+use crate::smalllog;
 
 /// 指定パスから設定ファイルを読み込む
 pub fn load<P: AsRef<Path>>(path: P) -> Result<Config> {
@@ -107,7 +110,8 @@ pub fn config_pathes() -> Result<Vec<PathBuf>> {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Config {
     repository_path: Option<PathBuf>,
-    verbose: Option<VerboseLevel>,
+    #[serde(default)]
+    log: Log,
 }
 
 impl Config {
@@ -121,20 +125,20 @@ impl Config {
         self.repository_path = Some(path.as_ref().to_owned());
     }
 
-    /// ログ表示のレベルを取得する。
-    pub fn verbose(&self) -> VerboseLevel {
-        self.verbose.unwrap_or_default()
-    }
-
     /// ログ表示のレベルを設定する。
-    pub fn set_verbose(&mut self, level: VerboseLevel) {
-        self.verbose = Some(level);
+    pub fn set_log_level(&mut self, level: LogLevel) {
+        self.log.level = Some(level);
     }
 
-    /// ログ表示レベルをロガーに適用する。
-    pub fn apply_verbose(&self) {
-        let mut builder = env_logger::builder();
-        builder.filter_level(self.verbose().into()).init();
+    /// 文字列で指定されたログ表示のレベルを設定する。
+    pub fn set_log_level_str(&mut self, level_str: &str) -> Result<()> {
+        self.set_log_level(level_str.parse()?);
+        Ok(())
+    }
+
+    /// ログ設定をロガーに適用する。
+    pub fn apply_log(&self) {
+        self.log.apply();
     }
 
     /***********************************************************/
@@ -143,7 +147,7 @@ impl Config {
     pub fn merged(&self, overwrite: &Config) -> Config {
         Config {
             repository_path: merge(&self.repository_path, &overwrite.repository_path),
-            verbose: merge(&self.verbose, &overwrite.verbose),
+            log: self.log.merged(&overwrite.log),
         }
     }
 
@@ -158,10 +162,38 @@ fn merge<T: Clone>(x: &Option<T>, overwrite: &Option<T>) -> Option<T> {
     overwrite.clone().or_else(|| x.clone())
 }
 
-/// 追加表示のレベル
+#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+struct Log {
+    output: Option<String>,
+    level: Option<LogLevel>,
+}
+
+impl Log {
+    fn apply(&self) {
+        match self.output.as_ref().map(String::as_str).unwrap_or("stderr") {
+            "stderr" => smalllog::use_stderr(),
+            name => {
+                if let Err(e) = smalllog::use_file(name) {
+                    error!("can't open log file {}: {}", name, e);
+                }
+            }
+        }
+
+        smalllog::set_level(self.level.unwrap_or_default().into());
+    }
+
+    pub fn merged(&self, overwrite: &Log) -> Log {
+        Log {
+            output: merge(&self.output, &overwrite.output),
+            level: merge(&self.level, &overwrite.level),
+        }
+    }
+}
+
+/// ログ表示のレベル
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum VerboseLevel {
+pub enum LogLevel {
     /// 無効
     Off,
     /// エラーのみ
@@ -176,34 +208,37 @@ pub enum VerboseLevel {
     Trace,
 }
 
-impl VerboseLevel {
-    /// コマンドラインオプションの`v`の数からログレベルを設定する。
-    pub fn from_v_count(count: usize) -> VerboseLevel {
-        match count {
-            0 => VerboseLevel::Error,
-            1 => VerboseLevel::Warn,
-            2 => VerboseLevel::Info,
-            3 => VerboseLevel::Debug,
-            _ => VerboseLevel::Trace,
+impl Default for LogLevel {
+    fn default() -> LogLevel {
+        LogLevel::Warn
+    }
+}
+
+impl FromStr for LogLevel {
+    type Err = Error;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "off" => Ok(LogLevel::Off),
+            "error" => Ok(LogLevel::Error),
+            "warn" => Ok(LogLevel::Warn),
+            "info" => Ok(LogLevel::Info),
+            "debug" => Ok(LogLevel::Debug),
+            "trace" => Ok(LogLevel::Trace),
+            s => Err(Error::InvalidLogLevel(s.to_owned())),
         }
     }
 }
 
-impl Default for VerboseLevel {
-    fn default() -> VerboseLevel {
-        VerboseLevel::Off
-    }
-}
-
-impl Into<LevelFilter> for VerboseLevel {
+impl Into<LevelFilter> for LogLevel {
     fn into(self) -> LevelFilter {
         match self {
-            VerboseLevel::Off => LevelFilter::Off,
-            VerboseLevel::Error => LevelFilter::Error,
-            VerboseLevel::Warn => LevelFilter::Warn,
-            VerboseLevel::Info => LevelFilter::Info,
-            VerboseLevel::Debug => LevelFilter::Debug,
-            VerboseLevel::Trace => LevelFilter::Trace,
+            LogLevel::Off => LevelFilter::Off,
+            LogLevel::Error => LevelFilter::Error,
+            LogLevel::Warn => LevelFilter::Warn,
+            LogLevel::Info => LevelFilter::Info,
+            LogLevel::Debug => LevelFilter::Debug,
+            LogLevel::Trace => LevelFilter::Trace,
         }
     }
 }
@@ -213,6 +248,10 @@ type Result<T> = std::result::Result<T, Error>;
 /// 設定ファイルの読み込みで発生しうるエラー
 #[derive(Debug, Fail)]
 pub enum Error {
+    /// 不正なログレベルが指定されている。
+    #[fail(display = "invalid log level: {}", _0)]
+    InvalidLogLevel(String),
+
     /// 入出力エラーが発生した
     #[fail(display = "failed scan with IO error: {}", _0)]
     IO(#[fail(cause)] io::Error),

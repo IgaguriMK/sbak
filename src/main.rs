@@ -5,11 +5,14 @@ use clap::{crate_authors, crate_description, crate_name, App, Arg};
 use failure::Fail;
 use log::trace;
 
-use sbak::config::{self, auto_load, load, VerboseLevel};
+use sbak::config::{self, auto_load, load};
+use sbak::smalllog;
 use sbak::sub::sub_commands;
 use sbak::version::version;
 
 fn main() {
+    smalllog::init();
+
     if let Err(e) = w_main() {
         eprintln!("{}", e);
         exit(1);
@@ -18,6 +21,7 @@ fn main() {
 
 fn w_main() -> Result<()> {
     let mut config = auto_load()?;
+    config.apply_log();
 
     let subs = sub_commands();
 
@@ -34,10 +38,11 @@ fn w_main() -> Result<()> {
                 .help("Extra config file"),
         )
         .arg(
-            Arg::with_name("verbose")
-                .short("v")
-                .multiple(true)
-                .help("Verbosity level"),
+            Arg::with_name("log_level")
+                .short("L")
+                .long("log-level")
+                .takes_value(true)
+                .help("Log level"),
         )
         .subcommands(subs.arg_defs());
 
@@ -49,14 +54,13 @@ fn w_main() -> Result<()> {
     if let Some(extra_config_file) = matches.value_of("config") {
         let extra_config = load(extra_config_file)?;
         config = config.merged(&extra_config);
+        config.apply_log();
     }
 
-    let cmd_verbose = matches.occurrences_of("verbose") as usize;
-    if cmd_verbose > 0 {
-        config.set_verbose(VerboseLevel::from_v_count(cmd_verbose));
+    if let Some(level_str) = matches.value_of("log_level") {
+        config.set_log_level_str(level_str)?;
+        config.apply_log();
     }
-
-    config.apply_verbose();
 
     trace!("config = {:?}", config);
 

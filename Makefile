@@ -41,14 +41,7 @@ doc-open:
 	cargo doc $(DOC_OPTION) --open
 
 .PHONY: release
-release: check pack
-
-.PHONY: pack
-pack: release-build
-	mkdir $(CRATE_NAME)
-	cp target/release/$(CRATE_NAME) ./$(CRATE_NAME)/
-	tar czf $(CRATE_NAME).tar.gz ./$(CRATE_NAME)
-	rm -r $(CRATE_NAME)
+release: check release-build
 
 .PHONY: soft-clean
 soft-clean:

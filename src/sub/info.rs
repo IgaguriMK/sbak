@@ -1,8 +1,9 @@
 use std::io;
 use std::process::exit;
 
-use clap::{App, ArgMatches, SubCommand};
+use clap::{App, Arg, ArgMatches, SubCommand};
 use failure::Fail;
+use log::{debug, error, info, trace, warn};
 
 use super::SubCmd;
 
@@ -20,7 +21,7 @@ impl Info {
         Info()
     }
 
-    fn wrapped_exec(&self, _matches: &ArgMatches, config: Config) -> Result<()> {
+    fn wrapped_exec(&self, matches: &ArgMatches, config: Config) -> Result<()> {
         println!("Version:");
         println!("    {}", version(GIT_HASH_LEN));
         println!();
@@ -28,6 +29,14 @@ impl Info {
         println!("Config:");
         config.show("    ");
         println!();
+
+        if matches.is_present("log_test") {
+            error!("Error log");
+            warn!("Warn log");
+            info!("info log");
+            debug!("Debug log");
+            trace!("Trace log");
+        }
 
         Ok(())
     }
@@ -39,7 +48,9 @@ impl SubCmd for Info {
     }
 
     fn command_args(&self) -> App {
-        SubCommand::with_name(self.name()).about("show informations")
+        SubCommand::with_name(self.name())
+            .about("show informations")
+            .arg(Arg::with_name("log_test").long("log-test"))
     }
 
     fn exec(&self, matches: &ArgMatches, config: Config) -> ! {
