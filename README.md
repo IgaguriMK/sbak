@@ -1,6 +1,9 @@
 sbak
 =======
 
+[![sbak at crates.io](https://img.shields.io/crates/v/sbak.svg)](https://crates.io/crates/sbak)
+[![sbak at docs.rs](https://docs.rs/sbak/badge.svg)](https://docs.rs/sbak)
+
 ## 概要
 
 `sbak` はファイルのハッシュ値ベースの簡易バックアップツールです。
