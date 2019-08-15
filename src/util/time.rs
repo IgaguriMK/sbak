@@ -49,10 +49,10 @@ impl Tz {
     }
 
     /// 指定された`unix_epoch`の日時表現`OutputDateTime`を返す。
-    pub fn at(&self, unix_epoch: u64) -> OutputDateTime {
+    pub fn at(self, unix_epoch: u64) -> OutputDateTime {
         OutputDateTime {
             unix_epoch,
-            zone: *self,
+            zone: self,
         }
     }
 }

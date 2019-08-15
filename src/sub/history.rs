@@ -55,7 +55,7 @@ impl History {
         }
 
         for history in &histories {
-            let at = history.timestamp().into_unix_epoch();
+            let at = history.timestamp().unix_epoch();
             println!("{}    {}", timezone.at(at).format_datetime(), history.id());
         }
 

@@ -390,7 +390,7 @@ impl History {
     }
 
     fn file_name(&self) -> String {
-        format!("{}{}", self.timestamp.into_unix_epoch(), HISTORY_SUFFIX)
+        format!("{}{}", self.timestamp.unix_epoch(), HISTORY_SUFFIX)
     }
 }
 
