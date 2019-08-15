@@ -12,6 +12,7 @@ use failure::Fail;
 use log::{error, LevelFilter};
 use serde::{Deserialize, Serialize};
 use toml::de::{self as toml_de, from_slice};
+use toml::to_string_pretty;
 
 use crate::smalllog;
 
@@ -152,9 +153,9 @@ impl Config {
     }
 
     /// 設定値を標準出力に表示する
-    pub fn show(&self, indent: &str) {
-        print!("{}", indent);
-        println!("repository_path:\t{:?}", self.repository_path);
+    pub fn show(&self) {
+        let s = to_string_pretty(self).unwrap();
+        print!("{}", s);
     }
 }
 

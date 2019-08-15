@@ -8,7 +8,7 @@ use log::{debug, error, info, trace, warn};
 use super::SubCmd;
 
 use crate::config::Config;
-use crate::version::{version, GIT_HASH_LEN};
+use crate::version::version;
 
 pub fn new() -> Box<dyn SubCmd> {
     Box::new(Info::new())
@@ -23,11 +23,11 @@ impl Info {
 
     fn wrapped_exec(&self, matches: &ArgMatches, config: Config) -> Result<()> {
         println!("Version:");
-        println!("    {}", version(GIT_HASH_LEN));
+        println!("    {}", version(10));
         println!();
 
         println!("Config:");
-        config.show("    ");
+        config.show();
         println!();
 
         if matches.is_present("log_test") {
