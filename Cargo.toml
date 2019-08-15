@@ -1,9 +1,29 @@
 [package]
 name = "sbak"
-version = "0.1.0"
-authors = ["Igaguri <igagurimk@gmail.com>"]
 edition = "2018"
+description = "Small file backup tool."
+version = "0.1.0"
+license = "MIT OR Apache-2.0"
+categories = ["command-line-utilities"]
+keywords = ["cli", "backup"]
+authors = ["Igaguri <igagurimk@gmail.com>"]
+readme = "README.md"
+documentation = "https://docs.rs/crate-name"
+repository = "https://github.com/IgaguriMK/sbak"
+
 
 [dependencies]
+chrono = "0.4.7"
+chrono-tz = "0.5.1"
 clap = "2.33"
+dirs = "2.0.2"
 failure = "0.1.5"
+filetime = "0.2.6"
+hex = "0.3.2"
+log = "0.4.8"
+lazy_static = "1.3.0"
+serde = {version="1.0.97", features=["derive"]}
+serde_json = "1.0.40"
+sha3 = "0.8.2"
+tempfile = "3.1.0"
+toml = "0.5.1"

@@ -1,5 +1,7 @@
 CRATE_NAME:=sbak
 
+DOC_OPTION:=--no-deps
+
 export GIT_BRANCH:=$(shell git rev-parse --abbrev-ref HEAD)
 export GIT_HASH:=$(shell git rev-parse HEAD)
 export GIT_DIFF:=$(shell git diff HEAD | wc -l)
@@ -27,17 +29,19 @@ release-build:
 .PHONY: check
 check: soft-clean
 	cargo test
+	cargo fmt -- --check
 	cargo clippy -- -D warnings
 
-.PHONY: release
-release: check pack
+.PHONY: doc
+doc:
+	cargo doc $(DOC_OPTION)
 
-.PHONY: pack
-pack: release-build
-	mkdir $(CRATE_NAME)
-	cp target/release/$(CRATE_NAME) ./$(CRATE_NAME)/
-	tar czf $(CRATE_NAME).tar.gz ./$(CRATE_NAME)
-	rm -r $(CRATE_NAME)
+.PHONY: doc-open
+doc-open:
+	cargo doc $(DOC_OPTION) --open
+
+.PHONY: release
+release: check release-build
 
 .PHONY: soft-clean
 soft-clean:
@@ -47,5 +51,3 @@ soft-clean:
 clean:
 	cargo clean
 	- rm $(CRATE_NAME).tar.gz
-	- rm *.zone
-	- rm *.rev

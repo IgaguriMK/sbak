@@ -1,2 +1,8 @@
 /target
 **/*.rs.bk
+
+/sample-*
+*.json
+*.txt
+/.sbak.toml
+/test.toml

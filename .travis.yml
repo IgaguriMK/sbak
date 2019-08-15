@@ -1,8 +1,16 @@
 language: rust
 rust:
   - stable
+os:
+  - linux
+  - windows
 before_script:
   - rustup component add clippy
 script:
   - cargo clippy -- -D warnings
   - cargo test
+cache:
+  directories:
+    - /home/travis/.cargo
+before_cache:
+  - rm -rf /home/travis/.cargo/registry
