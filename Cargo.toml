@@ -2,7 +2,11 @@
 name = "sbak"
 edition = "2018"
 description = "Small file backup tool."
+<<<<<<< HEAD
 version = "0.1.3"
+=======
+version = "0.1.1"
+>>>>>>> 70072f5... docs: Update version
 license = "MIT OR Apache-2.0"
 categories = ["command-line-utilities"]
 keywords = ["cli", "backup"]
