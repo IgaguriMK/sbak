@@ -7,6 +7,7 @@ use super::SubCmd;
 
 use crate::config::Config;
 use crate::core::repo::{self, Repository};
+use crate::util::time::Tz;
 
 pub fn new() -> Box<dyn SubCmd> {
     Box::new(History::new())
@@ -27,6 +28,8 @@ impl History {
         )?;
 
         let bank_name = matches.value_of("bank").unwrap();
+        let timezone =
+            Tz::from_name(matches.value_of("timezone")).map_err(Error::InvalidTimezone)?;
 
         let show_count_str = matches.value_of("show_count").unwrap();
         let show_count: usize = if show_count_str == "all" {
@@ -52,7 +55,8 @@ impl History {
         }
 
         for history in &histories {
-            println!("{}    {}", history.timestamp(), history.id());
+            let at = history.timestamp().into_unix_epoch();
+            println!("{}    {}", timezone.at(at).format_datetime(), history.id());
         }
 
         Ok(())
@@ -72,13 +76,22 @@ impl SubCmd for History {
                     .short("b")
                     .long("bank")
                     .takes_value(true)
-                    .required(true),
+                    .required(true)
+                    .help("Bank name"),
             )
             .arg(
                 Arg::with_name("show_count")
                     .short("n")
                     .long("show-cownt")
-                    .default_value("20"),
+                    .default_value("20")
+                    .help("How many history to be shown."),
+            )
+            .arg(
+                Arg::with_name("timezone")
+                    .short("z")
+                    .long("timezone")
+                    .default_value("local")
+                    .help("Show time in specified timezone."),
             )
     }
 
@@ -102,6 +115,9 @@ type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     #[fail(display = "Invalid command-line arguments: {}", _0)]
     InvalidCmdArg(String),
+
+    #[fail(display = "Invalid timezone: {}", _0)]
+    InvalidTimezone(String),
 
     #[fail(display = "no config value: {}", _0)]
     NoValue(&'static str),

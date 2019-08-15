@@ -8,4 +8,5 @@ pub mod config;
 pub mod core;
 pub mod smalllog;
 pub mod sub;
+pub mod util;
 pub mod version;

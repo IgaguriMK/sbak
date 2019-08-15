@@ -27,7 +27,7 @@ impl Timestamp {
     }
 
     /// Unix epochからの経過秒数を返す。
-    pub fn into_unix_epoch(self) -> u64 {
+    pub fn into_unix_epoch(&self) -> u64 {
         self.0
     }
 }
@@ -41,6 +41,7 @@ impl TryFrom<SystemTime> for Timestamp {
     }
 }
 
+#[deprecated(since = "0.1.0", note = "Use sbak::util::time")]
 impl fmt::Display for Timestamp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let nt = NaiveDateTime::from_timestamp(self.0 as i64, 0);
@@ -51,6 +52,18 @@ impl fmt::Display for Timestamp {
 impl Into<FileTime> for Timestamp {
     fn into(self) -> FileTime {
         FileTime::from_unix_time(self.0 as i64, 0)
+    }
+}
+
+impl Into<u64> for Timestamp {
+    fn into(self) -> u64 {
+        self.0
+    }
+}
+
+impl Into<i64> for Timestamp {
+    fn into(self) -> i64 {
+        self.0 as i64
     }
 }
 
