@@ -3,7 +3,7 @@ use std::process::exit;
 
 use clap::{App, Arg, ArgMatches, SubCommand};
 use failure::Fail;
-use log::{info, trace};
+use log::{error, info, trace};
 
 use super::SubCmd;
 
@@ -86,9 +86,10 @@ impl SubCmd for Backup {
         match self.wrapped_exec(matches, config) {
             Ok(()) => exit(0),
             Err(e) => {
-                eprintln!("{}", e);
                 if cfg!(debug_assertions) {
-                    eprintln!("{:#?}", e);
+                    error!("{:#?}", e);
+                } else {
+                    error!("{}", e);
                 }
                 exit(1)
             }

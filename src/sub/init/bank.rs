@@ -2,6 +2,7 @@ use std::process::exit;
 
 use clap::{App, Arg, ArgMatches, SubCommand};
 use failure::Fail;
+use log::error;
 
 use super::super::SubCmd;
 
@@ -77,9 +78,10 @@ impl SubCmd for Bank {
         match self.wrapped_exec(matches, config) {
             Ok(()) => exit(0),
             Err(e) => {
-                eprintln!("{}", e);
                 if cfg!(debug_assertions) {
-                    eprintln!("{:#?}", e);
+                    error!("{:#?}", e);
+                } else {
+                    error!("{}", e);
                 }
                 exit(1)
             }

@@ -57,9 +57,10 @@ impl SubCmd for Info {
         match self.wrapped_exec(matches, config) {
             Ok(()) => exit(0),
             Err(e) => {
-                eprintln!("{}", e);
                 if cfg!(debug_assertions) {
-                    eprintln!("{:#?}", e);
+                    error!("{:#?}", e);
+                } else {
+                    error!("{}", e);
                 }
                 exit(1)
             }
