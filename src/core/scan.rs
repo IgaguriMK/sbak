@@ -45,7 +45,26 @@ impl<'a> Scanner<'a> {
         Ok(id)
     }
 
-    fn scan_i(
+    fn scan_node(
+        &self,
+        p: &Path,
+        ignore_stack: &IgnoreStack,
+        last_entry: Option<&FsHash>,
+    ) -> Result<Option<FsHash>> {
+        match self.scan_node_inner(p, ignore_stack, last_entry) {
+            Ok(v) => Ok(v),
+            Err(Error::IO(e)) => {
+                if e.kind() == io::ErrorKind::PermissionDenied {
+                    Ok(None)
+                } else {
+                    Err(Error::IO(e))
+                }
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    fn scan_node_inner(
         &self,
         p: &Path,
         ignore_stack: &IgnoreStack,
@@ -112,7 +131,7 @@ impl<'a> Scanner<'a> {
             }
 
             if let Some(ch_hash) =
-                self.scan_i(&ch.path(), &current_stack, old_entry.find_child(&name))?
+                self.scan_node(&ch.path(), &current_stack, old_entry.find_child(&name))?
             {
                 builder.append(ch_hash);
             }
