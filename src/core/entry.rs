@@ -79,6 +79,7 @@ pub struct DirEntry {
     #[serde(default)]
     id: Option<HashID>,
     attr: Attributes,
+    #[serde(default)]
     children: Vec<FsHash>,
 }
 
