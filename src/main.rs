@@ -1,7 +1,7 @@
 use std::io::{stderr, Write};
 use std::process::exit;
 
-use clap::{crate_authors, crate_description, crate_name, App, Arg};
+use clap::{crate_description, crate_name, App, Arg};
 use failure::Fail;
 use log::trace;
 
@@ -27,7 +27,7 @@ fn w_main() -> Result<()> {
 
     let ver = version(8);
     let mut app = App::new(crate_name!())
-        .author(crate_authors!("\n"))
+        .author("Igaguri <igagurimk@gmail.com>")
         .about(crate_description!())
         .version(ver.as_str())
         .arg(
