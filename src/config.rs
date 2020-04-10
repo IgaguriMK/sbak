@@ -171,7 +171,7 @@ struct Log {
 
 impl Log {
     fn apply(&self) {
-        match self.output.as_ref().map(String::as_str).unwrap_or("stderr") {
+        match self.output.as_deref().unwrap_or("stderr") {
             "stderr" => smalllog::use_stderr(),
             name => {
                 if let Err(e) = smalllog::use_file(name) {

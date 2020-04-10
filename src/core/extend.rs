@@ -176,7 +176,7 @@ impl<'a> Extender<'a> {
         let symlink_entry: SymlinkEntry = self.bank.load_entry(&symlink_hash.id())?;
         let symink = Symlink::new(
             path.to_owned(),
-            symlink_entry.target().to_owned(),
+            symlink_entry.target(),
             symlink_entry.is_dir(),
         );
         self.symlinks.add(symink);

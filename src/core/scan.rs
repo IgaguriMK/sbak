@@ -121,7 +121,7 @@ impl<'a> Scanner<'a> {
             let name = ch
                 .file_name()
                 .into_string()
-                .map_err(|_| Error::NameIsInvalidUnicode(ch.path().to_owned()))?;
+                .map_err(|_| Error::NameIsInvalidUnicode(ch.path()))?;
             trace!("child name = {}", name);
 
             let fs_meta = fs::metadata(p)?;
@@ -150,7 +150,7 @@ impl<'a> Scanner<'a> {
         self.bank.save_object(&id, temp)?;
         trace!("dir entry saved {:?} = {}", p, id);
 
-        entry.set_id(id.clone());
+        entry.set_id(id);
 
         Ok(FsHash::try_from(entry).unwrap())
     }
@@ -180,7 +180,7 @@ impl<'a> Scanner<'a> {
         self.bank.save_object(&id, f)?;
         trace!("finish save file object {}", id);
 
-        entry.set_id(id.clone());
+        entry.set_id(id);
 
         Ok(FsHash::try_from(entry).unwrap())
     }
@@ -209,7 +209,7 @@ impl<'a> Scanner<'a> {
         self.bank.save_object(&id, temp)?;
         trace!("symlink entry saved {:?} = {}", p, id);
 
-        entry.set_id(id.clone());
+        entry.set_id(id);
 
         Ok(FsHash::try_from(entry).unwrap())
     }
