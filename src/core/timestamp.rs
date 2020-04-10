@@ -4,7 +4,7 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::time::{SystemTime, SystemTimeError, UNIX_EPOCH};
 
-use chrono::{TimeZone, Utc};
+use chrono::{Local, TimeZone, Utc};
 use failure::Fail;
 use filetime::FileTime;
 use serde::{Deserialize, Serialize};
@@ -43,8 +43,13 @@ impl TryFrom<SystemTime> for Timestamp {
 
 impl fmt::Display for Timestamp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let t = Utc.timestamp(self.0 as i64, 0);
-        write!(f, "{}", t.format("%Y-%m-%d %H:%M:%S %Z"))
+        if f.alternate() {
+            let t = Utc.timestamp(self.0 as i64, 0);
+            write!(f, "{}", t.format("%Y-%m-%d %H:%M:%S %Z"))
+        } else {
+            let t = Local.timestamp(self.0 as i64, 0);
+            write!(f, "{}", t.format("%Y-%m-%d %H:%M:%S %Z"))
+        }
     }
 }
 

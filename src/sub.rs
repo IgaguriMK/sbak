@@ -11,6 +11,7 @@ mod backup;
 mod history;
 mod info;
 mod init;
+mod list;
 mod restore;
 
 /// サブコマンドを表現するトレイト
@@ -35,6 +36,7 @@ pub fn sub_commands() -> SubCommandSet {
     set.append(history::new());
     set.append(init::new());
     set.append(info::new());
+    set.append(list::new());
     set.append(restore::new());
 
     set

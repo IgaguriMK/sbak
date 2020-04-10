@@ -80,7 +80,7 @@ impl Repository {
         let f = fs::File::open(&bank_dir.join(BANK_CONFIG_FILE))?;
         let config = from_reader(f)?;
 
-        Ok(Bank::new(self, bank_dir, config))
+        Ok(Bank::new(self, name, bank_dir, config))
     }
 
     /// 全ての[`Bank`](struct.Bank.html)を開くイテレータを取得する。
@@ -116,7 +116,7 @@ impl Repository {
         }
         let bank_config = BankConfig { target_path };
 
-        let bank = Bank::new(self, bank_dir, bank_config);
+        let bank = Bank::new(self, name, bank_dir, bank_config);
         bank.create()?;
         Ok(())
     }
@@ -218,13 +218,19 @@ impl<'a> Iterator for Banks<'a> {
 #[derive(Debug)]
 pub struct Bank<'a> {
     repo: &'a Repository,
+    name: String,
     path: PathBuf,
     config: BankConfig,
 }
 
 impl<'a> Bank<'a> {
-    fn new(repo: &'a Repository, path: PathBuf, config: BankConfig) -> Bank<'a> {
-        Bank { repo, path, config }
+    fn new(repo: &'a Repository, name: &str, path: PathBuf, config: BankConfig) -> Bank<'a> {
+        Bank {
+            repo,
+            name: name.to_owned(),
+            path,
+            config,
+        }
     }
 
     /// ファイルを指定された`id`のオブジェクトとして保存する。
@@ -272,6 +278,11 @@ impl<'a> Bank<'a> {
     /// 内部でファイルの整合性チェックが行われる。
     pub fn open_object(&self, id: &HashID) -> Result<fs::File, Error> {
         self.repo.open_object(id)
+    }
+
+    /// `Bank`の名前を得る。
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
     /// 最新の履歴を得る。
