@@ -8,17 +8,17 @@ use std::str::FromStr;
 #[cfg(target_os = "windows")]
 use std::env;
 
-use failure::Fail;
+use anyhow::{Context, Error, Result};
 use log::{error, LevelFilter};
 use serde::{Deserialize, Serialize};
-use toml::de::{self as toml_de, from_slice};
+use toml::de::from_slice;
 use toml::to_string_pretty;
 
 use crate::smalllog;
 
 /// 指定パスから設定ファイルを読み込む
 pub fn load<P: AsRef<Path>>(path: P) -> Result<Config> {
-    let mut f = File::open(&path)?;
+    let mut f = File::open(&path).context("opening config file")?;
     let mut buf = Vec::<u8>::new();
     f.read_to_end(&mut buf)?;
 
@@ -226,7 +226,7 @@ impl FromStr for LogLevel {
             "info" => Ok(LogLevel::Info),
             "debug" => Ok(LogLevel::Debug),
             "trace" => Ok(LogLevel::Trace),
-            s => Err(Error::InvalidLogLevel(s.to_owned())),
+            s => Err(Error::msg(format!("Invalid log level: {}", s))),
         }
     }
 }
@@ -241,35 +241,5 @@ impl Into<LevelFilter> for LogLevel {
             LogLevel::Debug => LevelFilter::Debug,
             LogLevel::Trace => LevelFilter::Trace,
         }
-    }
-}
-
-type Result<T> = std::result::Result<T, Error>;
-
-/// 設定ファイルの読み込みで発生しうるエラー
-#[derive(Debug, Fail)]
-pub enum Error {
-    /// 不正なログレベルが指定されている。
-    #[fail(display = "invalid log level: {}", _0)]
-    InvalidLogLevel(String),
-
-    /// 入出力エラーが発生した
-    #[fail(display = "failed scan with IO error: {}", _0)]
-    IO(#[fail(cause)] io::Error),
-
-    /// TOMLのパースに失敗した
-    #[fail(display = "failed parse entry: {}", _0)]
-    Parse(#[fail(cause)] toml_de::Error),
-}
-
-impl From<io::Error> for Error {
-    fn from(e: io::Error) -> Error {
-        Error::IO(e)
-    }
-}
-
-impl From<toml_de::Error> for Error {
-    fn from(e: toml_de::Error) -> Error {
-        Error::Parse(e)
     }
 }
