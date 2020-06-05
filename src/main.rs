@@ -1,11 +1,11 @@
 use std::io::{stderr, Write};
 use std::process::exit;
 
+use anyhow::{Context, Result};
 use clap::{crate_description, crate_name, App, Arg};
-use failure::Fail;
-use log::trace;
+use log::{error, trace};
 
-use sbak::config::{self, auto_load, load};
+use sbak::config::{auto_load, load};
 use sbak::smalllog;
 use sbak::sub::sub_commands;
 use sbak::version::version;
@@ -14,13 +14,16 @@ fn main() {
     smalllog::init();
 
     if let Err(e) = w_main() {
-        eprintln!("{}", e);
+        error!("Error: {}", e);
+        for c in e.chain().skip(1) {
+            error!("    at: {}", c);
+        }
         exit(1);
     }
 }
 
 fn w_main() -> Result<()> {
-    let mut config = auto_load()?;
+    let mut config = auto_load().context("loading aut-detected config file")?;
     config.apply_log();
 
     let subs = sub_commands();
@@ -52,13 +55,16 @@ fn w_main() -> Result<()> {
     let matches = app.get_matches();
 
     if let Some(extra_config_file) = matches.value_of("config") {
-        let extra_config = load(extra_config_file)?;
+        let extra_config = load(extra_config_file)
+            .with_context(|| format!("loading optional config file '{}'", extra_config_file))?;
         config = config.merged(&extra_config);
         config.apply_log();
     }
 
     if let Some(level_str) = matches.value_of("log_level") {
-        config.set_log_level_str(level_str)?;
+        config
+            .set_log_level_str(level_str)
+            .context("applying log level specified by command-line option")?;
         config.apply_log();
     }
 
@@ -73,20 +79,4 @@ fn w_main() -> Result<()> {
     out.write_all(&help_str).unwrap();
     eprintln!();
     exit(1);
-}
-
-type Result<T> = std::result::Result<T, Error>;
-
-/// 設定ファイルの読み込みで発生しうるエラー
-#[derive(Debug, Fail)]
-pub enum Error {
-    /// Config読み込みエラー
-    #[fail(display = "failed load config: {}", _0)]
-    Config(#[fail(cause)] config::Error),
-}
-
-impl From<config::Error> for Error {
-    fn from(e: config::Error) -> Error {
-        Error::Config(e)
-    }
 }
