@@ -1,7 +1,7 @@
 //! 設定ファイルを扱う。
 
 use std::fs::File;
-use std::io::{self, Read};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
