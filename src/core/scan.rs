@@ -82,8 +82,13 @@ impl<'a> Scanner<'a> {
         } else if file_type.is_file() {
             trace!("{:?} is file.", p);
             let old_hash = last_entry.and_then(|h| h.clone().try_into().ok());
-            let file_hash = self.scan_file(p, attr, old_hash)?;
-            Ok(Some(file_hash))
+            match self.scan_file(p, attr, old_hash) {
+                Ok(file_hash) => Ok(Some(file_hash)),
+                Err(e) => {
+                    warn!("while scannfing file {:?}: {}", p, e);
+                    Ok(None)
+                }
+            }
         } else if file_type.is_symlink() {
             let symlink_hash = self.scan_symlink(p, attr)?;
             Ok(Some(symlink_hash))
