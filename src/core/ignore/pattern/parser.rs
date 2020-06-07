@@ -2,8 +2,6 @@ use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read};
 use std::path::Path;
 
-use failure::Fail;
-
 use super::*;
 
 /// 除外パターンファイルを読み込む。
@@ -189,21 +187,15 @@ fn trim_char(s: &str) -> Option<(char, &str)> {
 type Result<T> = std::result::Result<T, Error>;
 
 /// パターンのパースで発生しうるエラー
-#[derive(Debug, Fail)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// パターン表現の文字列が不正である。
-    #[fail(display = "invalid pattern string: {}", _0)]
+    #[error("invalid pattern string: {0}")]
     InvalidPattern(String),
 
     /// 入出力エラー
-    #[fail(display = "failed scan with IO error: {}", _0)]
-    IO(#[fail(cause)] io::Error),
-}
-
-impl From<io::Error> for Error {
-    fn from(e: io::Error) -> Error {
-        Error::IO(e)
-    }
+    #[error("failed scan with IO error: {0}")]
+    IO(#[from] io::Error),
 }
 
 #[cfg(test)]

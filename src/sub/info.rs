@@ -2,7 +2,7 @@ use std::io;
 use std::process::exit;
 
 use clap::{App, Arg, ArgMatches, SubCommand};
-use failure::Fail;
+
 use log::{debug, error, info, trace, warn};
 
 use super::SubCmd;
@@ -70,14 +70,8 @@ impl SubCmd for Info {
 
 type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug, Fail)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[fail(display = "failed scan with IO error: {}", _0)]
-    IO(#[fail(cause)] io::Error),
-}
-
-impl From<io::Error> for Error {
-    fn from(e: io::Error) -> Error {
-        Error::IO(e)
-    }
+    #[error("failed scan with IO error: {0}")]
+    IO(#[from] io::Error),
 }

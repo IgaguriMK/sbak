@@ -5,7 +5,6 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use failure::Fail;
 use log::trace;
 use serde::{Deserialize, Serialize};
 use serde_json::{self, from_reader, to_writer};
@@ -413,10 +412,10 @@ fn ensure_dir(path: &Path) -> Result<(), io::Error> {
 }
 
 /// リポジトリ操作に関わるエラー
-#[derive(Debug, Fail)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// エントリのハッシュ値が一致しない
-    #[fail(display = "object not exists: {}", _0)]
+    #[error("object not exists")]
     BrokenObject {
         /// 期待されるID値
         to_be: HashID,
@@ -425,56 +424,34 @@ pub enum Error {
     },
 
     /// 指定されたエントリが存在しない
-    #[fail(display = "object not exists: {}", _0)]
+    #[error("object not exists: {0}")]
     EntryNotFound(HashID),
 
+    /// ハッシュ値の計算に失敗した
+    #[error("failed to calculate hash: {0}")]
+    HashError(#[from] hash::Error),
+
     /// 除外リストの読み込みに失敗した
-    #[fail(display = "failed load ignore patterns: {}", _0)]
-    IgnorePattern(#[fail(cause)] pattern::ParseError),
+    #[error("failed load ignore patterns: {0}")]
+    IgnorePattern(#[from] pattern::ParseError),
 
     /// リポジトリが不完全な状態である
-    #[fail(display = "repository isn't complete: {} is {}", _0, _1)]
+    #[error("repository isn't complete: {} is {}", _0, _1)]
     IncompleteRepo(&'static str, &'static str),
 
     /// パスがUnicodeで表現できない
-    #[fail(display = "invalid file name {:?}", _0)]
+    #[error("invalid file name {:?}", _0)]
     InvalidFileName(OsString),
 
     /// 入力が不正である。
-    #[fail(display = "invalid input: {}", _0)]
+    #[error("invalid input: {0}")]
     InvalidInput(String),
 
     /// 入出力エラーが発生した
-    #[fail(display = "failed scan with IO error: {}", _0)]
-    IO(#[fail(cause)] io::Error),
+    #[error("failed scan with IO error: {0}")]
+    IO(#[from] io::Error),
 
     /// JSONのパースに失敗した
-    #[fail(display = "failed parse entry: {}", _0)]
-    Parse(#[fail(cause)] serde_json::Error),
-}
-
-impl From<pattern::ParseError> for Error {
-    fn from(e: pattern::ParseError) -> Error {
-        Error::IgnorePattern(e)
-    }
-}
-
-impl From<io::Error> for Error {
-    fn from(e: io::Error) -> Error {
-        Error::IO(e)
-    }
-}
-
-impl From<hash::Error> for Error {
-    fn from(e: hash::Error) -> Error {
-        match e {
-            hash::Error::IO(e) => Error::IO(e),
-        }
-    }
-}
-
-impl From<serde_json::Error> for Error {
-    fn from(e: serde_json::Error) -> Error {
-        Error::Parse(e)
-    }
+    #[error("failed parse entry: {0}")]
+    Parse(#[from] serde_json::Error),
 }

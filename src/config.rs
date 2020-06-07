@@ -1,14 +1,13 @@
 //! 設定ファイルを扱う。
 
 use std::fs::File;
-use std::io::Read;
+use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 #[cfg(target_os = "windows")]
 use std::env;
 
-use anyhow::{Context, Error, Result};
 use log::{error, LevelFilter};
 use serde::{Deserialize, Serialize};
 use toml::de::from_slice;
@@ -18,7 +17,7 @@ use crate::smalllog;
 
 /// 指定パスから設定ファイルを読み込む
 pub fn load<P: AsRef<Path>>(path: P) -> Result<Config> {
-    let mut f = File::open(&path).context("opening config file")?;
+    let mut f = File::open(&path)?;
     let mut buf = Vec::<u8>::new();
     f.read_to_end(&mut buf)?;
 
@@ -226,7 +225,7 @@ impl FromStr for LogLevel {
             "info" => Ok(LogLevel::Info),
             "debug" => Ok(LogLevel::Debug),
             "trace" => Ok(LogLevel::Trace),
-            s => Err(Error::msg(format!("Invalid log level: {}", s))),
+            s => Err(Error::InvalidLogLevel(s.to_string())),
         }
     }
 }
@@ -242,4 +241,21 @@ impl Into<LevelFilter> for LogLevel {
             LogLevel::Trace => LevelFilter::Trace,
         }
     }
+}
+
+#[allow(missing_docs)]
+pub type Result<T> = std::result::Result<T, Error>;
+
+/// コンフィグファイルの取り扱いで発生しうるエラー
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    /// ログレベルの指定の文字列が不正である
+    #[error("invalid log level: {0}")]
+    InvalidLogLevel(String),
+    /// 入出力エラーが発生した
+    #[error("IO error: {0}")]
+    IO(#[from] io::Error),
+    /// コンフィグファイルのパースに失敗した
+    #[error("failed to parse config: {0}")]
+    ParseFailed(#[from] toml::de::Error),
 }

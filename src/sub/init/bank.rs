@@ -1,7 +1,7 @@
 use std::process::exit;
 
 use clap::{App, Arg, ArgMatches, SubCommand};
-use failure::Fail;
+
 use log::error;
 
 use super::super::SubCmd;
@@ -91,17 +91,11 @@ impl SubCmd for Bank {
 
 type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug, Fail)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[fail(display = "repository operation error: {}", _0)]
-    Repo(#[fail(cause)] repo::Error),
+    #[error("repository operation error: {0}")]
+    Repo(#[from] repo::Error),
 
-    #[fail(display = "{}", _0)]
+    #[error("{0}")]
     Arg(&'static str),
-}
-
-impl From<repo::Error> for Error {
-    fn from(e: repo::Error) -> Error {
-        Error::Repo(e)
-    }
 }

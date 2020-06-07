@@ -5,7 +5,6 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use failure::Fail;
 use log::{info, trace, warn};
 use serde_json::to_writer;
 
@@ -234,71 +233,39 @@ fn convert_metadata(path: &Path, fs_meta: &fs::Metadata) -> Result<Attributes> {
 type Result<T> = std::result::Result<T, Error>;
 
 /// ファイルシステムのスキャンで発生しうるエラー
-#[derive(Debug, Fail)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// エントリのJSONへのエンコードの失敗
-    #[fail(display = "failed parse FsEntry: {}", _0)]
-    Encode(#[fail(cause)] serde_json::Error),
+    #[error("failed parse FsEntry: {0}")]
+    Encode(#[from] serde_json::Error),
 
     /// 除外判定に失敗した。
-    #[fail(display = "failed load ignore patterns: {}", _0)]
-    Ignore(#[fail(cause)] ignore::Error),
+    #[error("failed load ignore patterns: {0}")]
+    Ignore(#[from] ignore::Error),
 
     /// 入出力エラー
-    #[fail(display = "failed scan with IO error: {}", _0)]
-    IO(#[fail(cause)] io::Error),
+    #[error("failed scan with IO error: {0}")]
+    IO(#[from] io::Error),
 
     /// 名前が空文字列である要素を発見した
-    #[fail(display = "found empty name entry at {:?}", _0)]
+    #[error("found empty name entry at {:?}", _0)]
     NameIsEmpty(PathBuf),
 
     /// パスがUnicodeで表現できない
-    #[fail(display = "found empty name entry at {:?}", _0)]
+    #[error("cannot convert file name to unicode {:?}", _0)]
     NameIsInvalidUnicode(PathBuf),
 
     /// リポジトリ操作エラーが発生
-    #[fail(display = "{}", _0)]
-    Repo(#[fail(cause)] repo::Error),
+    #[error("{0}")]
+    Repo(#[from] repo::Error),
 
     /// 対応範囲外のタイムスタンプを検出
-    #[fail(display = "timestamp is older than UNIX epoch")]
-    Timestamp,
-}
-
-impl From<ignore::Error> for Error {
-    fn from(e: ignore::Error) -> Error {
-        Error::Ignore(e)
-    }
-}
-
-impl From<io::Error> for Error {
-    fn from(e: io::Error) -> Error {
-        Error::IO(e)
-    }
-}
-
-impl From<timestamp::Error> for Error {
-    fn from(_e: timestamp::Error) -> Error {
-        Error::Timestamp
-    }
-}
-
-impl From<serde_json::Error> for Error {
-    fn from(e: serde_json::Error) -> Error {
-        Error::Encode(e)
-    }
+    #[error("timestamp is invalid: {0}")]
+    Timestamp(#[from] timestamp::Error),
 }
 
 impl From<hash::Error> for Error {
     fn from(e: hash::Error) -> Error {
-        match e {
-            hash::Error::IO(e) => Error::IO(e),
-        }
-    }
-}
-
-impl From<repo::Error> for Error {
-    fn from(e: repo::Error) -> Error {
-        Error::Repo(e)
+        Error::IO(e.into())
     }
 }

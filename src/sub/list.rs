@@ -1,7 +1,7 @@
 use std::process::exit;
 
 use clap::{App, Arg, ArgMatches, SubCommand};
-use failure::Fail;
+
 use log::error;
 
 use super::SubCmd;
@@ -81,17 +81,11 @@ impl SubCmd for List {
 
 type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug, Fail)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[fail(display = "no config value: {}", _0)]
+    #[error("no config value: {0}")]
     NoValue(&'static str),
 
-    #[fail(display = "repository operation error: {}", _0)]
-    Repo(#[fail(cause)] repo::Error),
-}
-
-impl From<repo::Error> for Error {
-    fn from(e: repo::Error) -> Error {
-        Error::Repo(e)
-    }
+    #[error("repository operation error: {0}")]
+    Repo(#[from] repo::Error),
 }

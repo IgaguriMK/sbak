@@ -8,8 +8,6 @@ use std::path::{Component, Path, PathBuf};
 use log::trace;
 use pattern::{load_patterns, Match, Patterns};
 
-use failure::Fail;
-
 #[cfg(test)]
 mod test;
 
@@ -133,29 +131,23 @@ impl<'a> IgnoreStack<'a> {
 type Result<T> = std::result::Result<T, Error>;
 
 /// ファイルの除外判定で発生しうるエラー
-#[derive(Debug, Fail)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// 除外リストの読み込みに失敗した
-    #[fail(display = "failed load ignore patterns: {}", _0)]
-    IgnorePattern(#[fail(cause)] pattern::ParseError),
+    #[error("failed load ignore patterns: {0}")]
+    IgnorePattern(#[from] pattern::ParseError),
 
     /// エントリのパスがバックアップ対象のルートの子ではない。
-    #[fail(display = "invalid path: {:?} is not child of {:?} ", _0, _1)]
+    #[error("invalid path: {:?} is not child of {:?} ", _0, _1)]
     NotChild(PathBuf, PathBuf),
 
     /// エントリのパスの一部が正しいUnicodeに変換できない。
-    #[fail(display = "invalid path: contains non-unicode part {:?} ", _0)]
+    #[error("invalid path: contains non-unicode part {:?} ", _0)]
     NotValidUnicode(OsString),
 
     /// エントリのパスの一部にファイル名ではない部分がある。
-    #[fail(display = "invalid path: contains non-normal part {} ", _0)]
+    #[error("invalid path: contains non-normal part {} ", _0)]
     UnexpectedComponent(String),
-}
-
-impl From<pattern::ParseError> for Error {
-    fn from(e: pattern::ParseError) -> Error {
-        Error::IgnorePattern(e)
-    }
 }
 
 impl From<OsString> for Error {

@@ -16,7 +16,7 @@ fn main() {
     if let Err(e) = w_main() {
         error!("Error: {}", e);
         for c in e.chain().skip(1) {
-            error!("    at: {}", c);
+            error!("    < {}", c);
         }
         exit(1);
     }

@@ -2,7 +2,7 @@ use std::io;
 use std::process::exit;
 
 use clap::{App, Arg, ArgMatches, SubCommand};
-use failure::Fail;
+
 use log::{error, info, trace};
 
 use super::SubCmd;
@@ -99,44 +99,20 @@ impl SubCmd for Backup {
 
 type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug, Fail)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[fail(display = "{}", _0)]
+    #[error("{0}")]
     Arg(&'static str),
 
-    #[fail(display = "failed scan with IO error: {}", _0)]
-    IO(#[fail(cause)] io::Error),
+    #[error("failed scan with IO error: {0}")]
+    IO(#[from] io::Error),
 
-    #[fail(display = "file scan error: {}", _0)]
-    Scan(#[fail(cause)] scan::Error),
+    #[error("file scan error: {0}")]
+    Scan(#[from] scan::Error),
 
-    #[fail(display = "repository operation error: {}", _0)]
-    Repo(#[fail(cause)] repo::Error),
+    #[error("repository operation error: {0}")]
+    Repo(#[from] repo::Error),
 
-    #[fail(display = "timestamp is older than UNIX epoch")]
-    Timestamp,
-}
-
-impl From<io::Error> for Error {
-    fn from(e: io::Error) -> Error {
-        Error::IO(e)
-    }
-}
-
-impl From<scan::Error> for Error {
-    fn from(e: scan::Error) -> Error {
-        Error::Scan(e)
-    }
-}
-
-impl From<repo::Error> for Error {
-    fn from(e: repo::Error) -> Error {
-        Error::Repo(e)
-    }
-}
-
-impl From<timestamp::Error> for Error {
-    fn from(_e: timestamp::Error) -> Error {
-        Error::Timestamp
-    }
+    #[error("timestamp is invalid: {0}")]
+    Timestamp(#[from] timestamp::Error),
 }

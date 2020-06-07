@@ -4,7 +4,6 @@ use std::fmt;
 use std::fs::File;
 use std::io::{self, copy, Read, Seek, SeekFrom, Write};
 
-use failure::Fail;
 use hex::encode;
 use serde::{Deserialize, Serialize};
 use sha3::{Digest, Sha3_256};
@@ -77,15 +76,16 @@ pub fn hash_reader<R: Read>(mut r: R) -> Result<(HashID, File)> {
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// ファイルシステムのスキャンで発生しうるエラー
-#[derive(Debug, Fail)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// 入出力エラーが発生した
-    #[fail(display = "failed scan with IO error: {}", _0)]
-    IO(#[fail(cause)] io::Error),
+    #[error("failed scan with IO error: {0}")]
+    IO(#[from] io::Error),
 }
 
-impl From<io::Error> for Error {
-    fn from(e: io::Error) -> Error {
-        Error::IO(e)
+impl Into<io::Error> for Error {
+    fn into(self) -> io::Error {
+        let Error::IO(e) = self;
+        e
     }
 }

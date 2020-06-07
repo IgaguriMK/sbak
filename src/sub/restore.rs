@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::process::exit;
 
 use clap::{App, Arg, ArgMatches, SubCommand};
-use failure::Fail;
+
 use log::error;
 
 use super::SubCmd;
@@ -150,26 +150,14 @@ impl SubCmd for Restore {
 
 type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug, Fail)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[fail(display = "{}", _0)]
+    #[error("{0}")]
     Arg(&'static str),
 
-    #[fail(display = "failed extend: {}", _0)]
-    Extend(#[fail(cause)] extend::Error),
+    #[error("failed extend: {0}")]
+    Extend(#[from] extend::Error),
 
-    #[fail(display = "repository operation error: {}", _0)]
-    Repo(#[fail(cause)] repo::Error),
-}
-
-impl From<extend::Error> for Error {
-    fn from(e: extend::Error) -> Error {
-        Error::Extend(e)
-    }
-}
-
-impl From<repo::Error> for Error {
-    fn from(e: repo::Error) -> Error {
-        Error::Repo(e)
-    }
+    #[error("repository operation error: {0}")]
+    Repo(#[from] repo::Error),
 }

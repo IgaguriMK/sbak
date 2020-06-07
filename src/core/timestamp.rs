@@ -5,7 +5,7 @@ use std::fmt;
 use std::time::{SystemTime, SystemTimeError, UNIX_EPOCH};
 
 use chrono::{Local, TimeZone, Utc};
-use failure::Fail;
+
 use filetime::FileTime;
 use serde::{Deserialize, Serialize};
 
@@ -74,10 +74,10 @@ impl Into<i64> for Timestamp {
 type Result<T> = std::result::Result<T, Error>;
 
 /// タイムスタンプ操作に関わるエラー
-#[derive(Debug, Fail)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// 対象日時のUNIX epochが負になっている
-    #[fail(display = "timestamp is older than UNIX epoch")]
+    #[error("timestamp is older than UNIX epoch")]
     NegativeUnixTime,
 }
 

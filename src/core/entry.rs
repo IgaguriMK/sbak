@@ -3,7 +3,6 @@
 use std::convert::{TryFrom, TryInto};
 use std::path::PathBuf;
 
-use failure::Fail;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
@@ -475,14 +474,14 @@ impl TryFrom<FsHash> for SymlinkHash {
 }
 
 /// エントリの[`FsHash`](struct.FsHash.html)への変換で発生しうるエラー
-#[derive(Debug, Fail)]
+#[derive(Debug, thiserror::Error)]
 pub enum NoIdError {
     /// IDが未設定である
-    #[fail(display = "entry id isn't calculated")]
+    #[error("entry id isn't calculated")]
     NoId,
 }
 
 /// [`FsHash`](struct.FsHash.html)から[`DirHash`](struct.DirHash.html)や[`FileHash`](struct.FileHash.html)への変換で発生しうるエラー
-#[derive(Debug, Fail)]
-#[fail(display = "mismatch hash type")]
+#[derive(Debug, thiserror::Error)]
+#[error("mismatch hash type")]
 pub struct MismatchHashType(FsHash);
