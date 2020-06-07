@@ -28,7 +28,7 @@ fn w_main() -> Result<()> {
 
     let subs = sub_commands();
 
-    let ver = version(8);
+    let ver = version();
     let mut app = App::new(crate_name!())
         .author("Igaguri <igagurimk@gmail.com>")
         .about(crate_description!())

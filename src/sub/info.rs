@@ -23,7 +23,7 @@ impl Info {
 
     fn wrapped_exec(&self, matches: &ArgMatches, config: Config) -> Result<()> {
         println!("Version:");
-        println!("    {}", version(10));
+        println!("    {}", version());
         println!();
 
         println!("Config:");
