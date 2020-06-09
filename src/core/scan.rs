@@ -53,11 +53,8 @@ impl<'a> Scanner<'a> {
         match self.scan_node_inner(p, ignore_stack, last_entry) {
             Ok(v) => Ok(v),
             Err(Error::IO(e)) => {
-                if e.kind() == io::ErrorKind::PermissionDenied {
-                    Ok(None)
-                } else {
-                    Err(Error::IO(e))
-                }
+                warn!("while scannfing {:?}: {}", p, e);
+                Ok(None)
             }
             Err(e) => Err(e),
         }
@@ -82,13 +79,8 @@ impl<'a> Scanner<'a> {
         } else if file_type.is_file() {
             trace!("{:?} is file.", p);
             let old_hash = last_entry.and_then(|h| h.clone().try_into().ok());
-            match self.scan_file(p, attr, old_hash) {
-                Ok(file_hash) => Ok(Some(file_hash)),
-                Err(e) => {
-                    warn!("while scannfing file {:?}: {}", p, e);
-                    Ok(None)
-                }
-            }
+            let file_hash = self.scan_file(p, attr, old_hash)?;
+            Ok(Some(file_hash))
         } else if file_type.is_symlink() {
             let symlink_hash = self.scan_symlink(p, attr)?;
             Ok(Some(symlink_hash))
