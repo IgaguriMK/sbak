@@ -16,12 +16,12 @@ const BUFFER_SIZE: usize = 4096;
 pub struct HashID(String);
 
 impl HashID {
-    /// ハッシュ値の文字列表現を4-4-56文字に分割して返す。
+    /// ハッシュ値の文字列表現を2-2-60文字に分割して返す。
     ///
     /// リポジトリでの保存先ディレクトリの階層化に使われる。
     pub fn parts(&self) -> (&str, &str, &str) {
         let s = self.0.as_str();
-        (&s[0..4], &s[4..8], &s[8..])
+        (&s[0..2], &s[2..4], &s[4..])
     }
 
     /// 文字列表現への参照を返す。
