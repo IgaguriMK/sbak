@@ -78,11 +78,7 @@ impl SubCmd for Bank {
         match self.wrapped_exec(matches, config) {
             Ok(()) => exit(0),
             Err(e) => {
-                if cfg!(debug_assertions) {
-                    error!("{:#?}", e);
-                } else {
-                    error!("{}", e);
-                }
+                crate::util::dump_error(e);
                 exit(1)
             }
         }
