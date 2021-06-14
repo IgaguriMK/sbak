@@ -1,110 +1,10 @@
 //! 設定ファイルを扱う。
 
-use std::fs::File;
-use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-#[cfg(target_os = "windows")]
-use std::env;
-
-use log::{error, LevelFilter};
 use serde::{Deserialize, Serialize};
-use toml::de::from_slice;
 use toml::to_string_pretty;
-
-use crate::smalllog;
-
-/// 指定パスから設定ファイルを読み込む
-pub fn load<P: AsRef<Path>>(path: P) -> Result<Config> {
-    let mut f = File::open(&path)?;
-    let mut buf = Vec::<u8>::new();
-    f.read_to_end(&mut buf)?;
-
-    Ok(from_slice(&buf)?)
-}
-
-/// 指定パスからの設定ファイルの読み込みを試行する。
-///
-/// 存在しない場合Noneを返す。
-pub fn try_load<P: AsRef<Path>>(path: P) -> Result<Option<Config>> {
-    let path = path.as_ref();
-
-    if !path.exists() {
-        return Ok(None);
-    }
-
-    Some(load(path)).transpose()
-}
-
-/// 既定のパス([`config_pathes()`](fn.config_pathes.html))から設定を読み込む
-pub fn auto_load() -> Result<Config> {
-    let mut config = Config::default();
-
-    for path in config_pathes()? {
-        if let Some(c) = try_load(&path)? {
-            config = config.merged(&c);
-        }
-    }
-
-    Ok(config)
-}
-
-/// 起動時に読み込む設定ファイルの探索パスの一覧を返す。
-///
-/// ターゲットとなる環境に応じて切り替えられる。
-/// 現在表示されているのはLinux向け。
-#[cfg(target_os = "linux")]
-pub fn config_pathes() -> Result<Vec<PathBuf>> {
-    let mut pathes = Vec::<PathBuf>::new();
-
-    // システム共通設定
-    pathes.push("/etc/sbak.toml".parse().unwrap());
-
-    // ユーザー設定
-    if let Some(mut home_dir) = dirs::home_dir() {
-        home_dir.push(".sbak.toml");
-        pathes.push(home_dir);
-    }
-
-    Ok(pathes)
-}
-
-/// 起動時に読み込む設定ファイルの探索パスの一覧を返す。
-///
-/// ターゲットとなる環境に応じて切り替えられる。
-/// 現在表示されているのはWindows向け。
-#[cfg(target_os = "windows")]
-pub fn config_pathes() -> Result<Vec<PathBuf>> {
-    let mut pathes = Vec::<PathBuf>::new();
-
-    // インストール場所設定
-    if let Ok(exe_path) = env::current_exe() {
-        let mut exe_dir = exe_path.canonicalize()?.parent().unwrap().to_owned();
-        exe_dir.push("sbak.toml");
-        pathes.push(exe_dir);
-    }
-
-    // ユーザー設定（UNIXスタイルのパス）
-    if let Some(home_dir) = dirs::home_dir() {
-        let mut with_dot = home_dir.clone();
-        with_dot.push(".sbak.toml");
-        pathes.push(with_dot);
-
-        let mut without_dot = home_dir;
-        without_dot.push("sbak.toml");
-        pathes.push(without_dot);
-    }
-
-    // ユーザー設定（Windowsスタイルのパス）
-    if let Some(mut roaming) = dirs::config_dir() {
-        roaming.push("sbak");
-        roaming.push("config.toml");
-        pathes.push(roaming);
-    }
-
-    Ok(pathes)
-}
 
 /// 設定ファイルの内容
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -131,14 +31,9 @@ impl Config {
     }
 
     /// 文字列で指定されたログ表示のレベルを設定する。
-    pub fn set_log_level_str(&mut self, level_str: &str) -> Result<()> {
+    pub fn set_log_level_str(&mut self, level_str: &str) -> Result<(), LogLevelParseError> {
         self.set_log_level(level_str.parse()?);
         Ok(())
-    }
-
-    /// ログ設定をロガーに適用する。
-    pub fn apply_log(&self) {
-        self.log.apply();
     }
 
     /***********************************************************/
@@ -169,19 +64,6 @@ struct Log {
 }
 
 impl Log {
-    fn apply(&self) {
-        match self.output.as_deref().unwrap_or("stderr") {
-            "stderr" => smalllog::use_stderr(),
-            name => {
-                if let Err(e) = smalllog::use_file(name) {
-                    error!("can't open log file {}: {}", name, e);
-                }
-            }
-        }
-
-        smalllog::set_level(self.level.unwrap_or_default().into());
-    }
-
     pub fn merged(&self, overwrite: &Log) -> Log {
         Log {
             output: merge(&self.output, &overwrite.output),
@@ -204,8 +86,6 @@ pub enum LogLevel {
     Info,
     /// デバッグ用
     Debug,
-    /// より詳細なデバッグ用
-    Trace,
 }
 
 impl Default for LogLevel {
@@ -215,7 +95,7 @@ impl Default for LogLevel {
 }
 
 impl FromStr for LogLevel {
-    type Err = Error;
+    type Err = LogLevelParseError;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
@@ -224,38 +104,12 @@ impl FromStr for LogLevel {
             "warn" => Ok(LogLevel::Warn),
             "info" => Ok(LogLevel::Info),
             "debug" => Ok(LogLevel::Debug),
-            "trace" => Ok(LogLevel::Trace),
-            s => Err(Error::InvalidLogLevel(s.to_string())),
+            s => Err(LogLevelParseError(s.to_string())),
         }
     }
 }
 
-impl Into<LevelFilter> for LogLevel {
-    fn into(self) -> LevelFilter {
-        match self {
-            LogLevel::Off => LevelFilter::Off,
-            LogLevel::Error => LevelFilter::Error,
-            LogLevel::Warn => LevelFilter::Warn,
-            LogLevel::Info => LevelFilter::Info,
-            LogLevel::Debug => LevelFilter::Debug,
-            LogLevel::Trace => LevelFilter::Trace,
-        }
-    }
-}
-
-#[allow(missing_docs)]
-pub type Result<T> = std::result::Result<T, Error>;
-
-/// コンフィグファイルの取り扱いで発生しうるエラー
+/// ログレベルのパースに失敗したときに返されるエラー
 #[derive(Debug, thiserror::Error)]
-pub enum Error {
-    /// ログレベルの指定の文字列が不正である
-    #[error("invalid log level: {0}")]
-    InvalidLogLevel(String),
-    /// 入出力エラーが発生した
-    #[error("IO error: {0}")]
-    IO(#[from] io::Error),
-    /// コンフィグファイルのパースに失敗した
-    #[error("failed to parse config: {0}")]
-    ParseFailed(#[from] toml::de::Error),
-}
+#[error("invalid log level: {0}")]
+pub struct LogLevelParseError(String);
